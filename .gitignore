@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.spec
+setup-build-X99-Secureboot-patcher.log
+*.report.txt
+*.report.json
+*.build.log

@@ -1,0 +1,23 @@
+Chinesium X99 SecureBoot Patcher v0.9 — source completeness
+============================================================
+
+This repository contains the complete application source and the complete
+validated Secure Boot update payload set used by v0.9.
+
+Included:
+- GUI and CLI entry points;
+- all x99sb Python modules;
+- build/setup scripts;
+- full regression test source;
+- exact PK/KEK/db Secure Boot update FFS payloads;
+- UEFIReplace acquisition and hash-verification instructions.
+
+Intentionally NOT redistributed:
+- UEFIReplace.exe
+
+Obtain the exact required helper from the official LongSoft/UEFITool 0.28.0
+release and place it at tools\UEFIReplace.exe:
+https://github.com/LongSoft/UEFITool/releases/download/0.28.0/UEFIReplace_0.28.0_win32.zip
+
+Required SHA-256:
+ab05d53fcac19651818f4ee4505813b10badec7a10d141836fff3bba8964ed8b
