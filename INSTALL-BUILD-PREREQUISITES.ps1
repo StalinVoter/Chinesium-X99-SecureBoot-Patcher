@@ -13,7 +13,11 @@ $DistExe = Join-Path $Root 'dist\X99-Secureboot-patcher.exe'
 $UefiReplace = Join-Path $Root 'tools\UEFIReplace.exe'
 $ExpectedUefiReplace = 'ab05d53fcac19651818f4ee4505813b10badec7a10d141836fff3bba8964ed8b'
 $UefiReplaceUrl = 'https://github.com/LongSoft/UEFITool/releases/download/0.28.0/UEFIReplace_0.28.0_win32.zip'
-$UefiReplaceRelease = 'https://github.com/LongSoft/UEFITool/releases/tag/0.28.0'
+$Fpt = Join-Path $Root 'tools\fptw64.exe'
+$ExpectedFpt = 'b7e942e903f5f6bba84c3e9294edc8cc097c1173ca249a41a4cca1ab9e15a697'
+$FptFolderUrl = 'https://github.com/CE1CECL/IntelCSTools/tree/ce1cecl/ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64'
+$Fparts = Join-Path $Root 'fpt_support\fparts.txt'
+$ExpectedFparts = '9f815e22fdc5562f0af6ac552c27e0adccf9f3654c3d76dbc4f9cc9278bc2313'
 
 function Write-Log([string]$Message) {
     $line = '{0} {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Message
@@ -30,24 +34,42 @@ function Download-VerifiedFile([string]$Uri,[string]$Destination,[string]$Expect
 }
 
 '' | Set-Content -LiteralPath $LogPath -Encoding UTF8
-Write-Log 'Starting X99 Secureboot patcher build-environment setup.'
+Write-Log 'Starting X99 Secureboot patcher v0.964 build-environment setup.'
 Write-Log "Source folder: $Root"
 if (-not (Test-Path $BuildScript -PathType Leaf)) { Fail 'build_exe.bat is missing.' }
 if (-not (Test-Path $Requirements -PathType Leaf)) { Fail 'requirements.txt is missing.' }
+
 if (-not (Test-Path $UefiReplace -PathType Leaf)) {
     Write-Host ''
     Write-Host 'UEFIReplace 0.28.0 is required and is not redistributed with this project.' -ForegroundColor Yellow
-    Write-Host "Official release: $UefiReplaceRelease"
     Write-Host "Exact Windows archive: $UefiReplaceUrl"
     Write-Host 'Extract UEFIReplace.exe into tools\UEFIReplace.exe and run this script again.'
     Write-Host "Required SHA-256: $ExpectedUefiReplace"
     Fail 'Required external UEFIReplace.exe is not present.'
 }
 $toolHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $UefiReplace).Hash.ToLowerInvariant()
-if ($toolHash -ne $ExpectedUefiReplace) {
-    Fail "UEFIReplace.exe hash mismatch: $toolHash. Expected $ExpectedUefiReplace from $UefiReplaceUrl"
-}
+if ($toolHash -ne $ExpectedUefiReplace) { Fail "UEFIReplace.exe hash mismatch: $toolHash. Expected $ExpectedUefiReplace" }
 Write-Log "Official UEFIReplace 0.28.0 verified: $toolHash"
+
+$requiredFptFiles = @('fptw64.exe','pmxdll32e.DLL','idrvdll32e.DLL')
+foreach ($name in $requiredFptFiles) {
+    $p = Join-Path $Root ("tools\" + $name)
+    if (-not (Test-Path $p -PathType Leaf)) {
+        Write-Host ''
+        Write-Host 'Intel Flash Programming Tool 9.1.10.1000 files are required for BIOS dump/flash.' -ForegroundColor Yellow
+        Write-Host "Verified source folder: $FptFolderUrl"
+        Write-Host 'Copy fptw64.exe, pmxdll32e.DLL and idrvdll32e.DLL into tools\ and run this script again.'
+        Fail "Required external FPT file is missing: $name"
+    }
+}
+$fptHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $Fpt).Hash.ToLowerInvariant()
+if ($fptHash -ne $ExpectedFpt) { Fail "fptw64.exe hash mismatch: $fptHash. Expected $ExpectedFpt (FPT 9.1.10.1000)" }
+Write-Log "Intel FPT 9.1.10.1000 verified: $fptHash"
+
+if (-not (Test-Path $Fparts -PathType Leaf)) { Fail 'fpt_support\fparts.txt is missing.' }
+$fpartsHash=(Get-FileHash -Algorithm SHA256 -LiteralPath $Fparts).Hash.ToLowerInvariant()
+if ($fpartsHash -ne $ExpectedFparts) { Fail "Bundled authoritative fparts.txt hash mismatch: $fpartsHash" }
+Write-Log "Authoritative fparts.txt verified: $fpartsHash"
 
 $PythonVersion='3.13.14'
 $PythonUrl="https://www.python.org/ftp/python/$PythonVersion/python-$PythonVersion-amd64.exe"

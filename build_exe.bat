@@ -27,19 +27,29 @@ echo Using Python: %PYTHON_CALL%
 %PYTHON_CALL% -m pip install --disable-pip-version-check -r requirements.txt pyinstaller
 if errorlevel 1 exit /b 1
 
-%PYTHON_CALL% -m PyInstaller --noconfirm --clean --onefile --windowed --name X99-Secureboot-patcher X99SecurebootPatcher-GUI.py
+%PYTHON_CALL% -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name X99-Secureboot-patcher X99SecurebootPatcher-GUI.py
 if errorlevel 1 exit /b 1
 %PYTHON_CALL% -m PyInstaller --noconfirm --clean --onefile --name X99-Secureboot-patcher-CLI X99SecurebootPatcher-CLI.py
 if errorlevel 1 exit /b 1
 
 if not exist "dist\tools" mkdir "dist\tools"
 if not exist "dist\secureboot_donors" mkdir "dist\secureboot_donors"
+if not exist "dist\fpt_support" mkdir "dist\fpt_support"
 copy /y "tools\UEFIReplace.exe" "dist\tools\UEFIReplace.exe" >nul
+copy /y "tools\fptw64.exe" "dist\tools\fptw64.exe" >nul
+copy /y "tools\pmxdll32e.DLL" "dist\tools\pmxdll32e.DLL" >nul
+copy /y "tools\idrvdll32e.DLL" "dist\tools\idrvdll32e.DLL" >nul
+copy /y "fpt_support\fparts.txt" "dist\fpt_support\fparts.txt" >nul
+copy /y "fpt_support\fparts.txt" "dist\tools\fparts.txt" >nul
 copy /y "secureboot_donors\PkVar.ffs" "dist\secureboot_donors\PkVar.ffs" >nul
 copy /y "secureboot_donors\KekVar.ffs" "dist\secureboot_donors\KekVar.ffs" >nul
 copy /y "secureboot_donors\dbVar.ffs" "dist\secureboot_donors\dbVar.ffs" >nul
+copy /y "README.txt" "dist\README.txt" >nul
+copy /y "tools\README.txt" "dist\tools\README.txt" >nul
 
 echo.
 echo Built: dist\X99-Secureboot-patcher.exe
 echo Built: dist\X99-Secureboot-patcher-CLI.exe
-echo Verified external UEFIReplace 0.28.0 and validated Secure Boot update payloads copied beside the executables.
+echo Copied: dist\README.txt
+echo Copied: dist\tools\README.txt
+echo External UEFIReplace/FPT files, validated payloads, and the authoritative fparts.txt were copied into dist.

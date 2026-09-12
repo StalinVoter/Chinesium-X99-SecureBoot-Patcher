@@ -630,7 +630,7 @@ def repair_fit_file(path: Path, reference: dict[str, Any] | None = None) -> dict
 def capture_fit_rebuild_reference(path: Path) -> dict[str, Any]:
     """Capture only the FIT relationships needed to undo rebuild-induced damage.
 
-    v0.9 deliberately does not "clean up" the input firmware. A PASS input is
+    v0.962 deliberately does not "clean up" the input firmware. A PASS input is
     preserved as PASS. A safely-understood STALE input keeps exactly its
     pre-existing displacement to the same microcode identities. An INVALID or
     unparsable input is never made into a general repair project by this app.
@@ -806,7 +806,7 @@ def repair_fit_rebuild_damage(path: Path, reference: dict[str, Any]) -> dict[str
 
     # If the input state was INVALID, do not reinterpret it. We can only accept
     # the rebuild unchanged with respect to all microcode addresses and Type-1
-    # addresses. This keeps v0.9 permissive about the input while refusing to
+    # addresses. This keeps v0.962 permissive about the input while refusing to
     # invent a repair plan for an already-ambiguous structure.
     if reference.get('status') == 'INVALID':
         before_micro_addresses = {

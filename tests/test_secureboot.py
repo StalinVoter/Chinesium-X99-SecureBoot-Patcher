@@ -2,6 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import os
 import shutil
+import subprocess
 import tempfile
 
 import pytest
@@ -12,6 +13,7 @@ from x99sb.fit import inspect_fit, parse_fit, capture_fit_rebuild_reference, rep
 from x99sb.pipeline import default_output, inspect_rom
 from x99sb.secureboot import inspect_secure_boot, inspect_donor_ffs, load_bundled_donors
 from x99sb.tools import validate_uefireplace
+from x99sb import replacer as replacer_mod
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = Path(os.environ.get('X99_SB_TEST_DATA', '/nonexistent'))
@@ -56,6 +58,27 @@ def test_bundled_donors_are_exact_and_structurally_valid():
 def test_default_output_is_sb2023_only():
     assert default_output(Path('bios.ROM')).name == 'bios_SB2023.ROM'
     assert default_output(Path('bios.bin')).name == 'bios_SB2023.bin'
+
+
+def test_bundled_pk_has_generic_classification_and_exact_payload_identity():
+    from x99sb.secureboot import _inspect_one
+    data = (ROOT / 'secureboot_donors' / 'PkVar.ffs').read_bytes()
+    result = _inspect_one(data, 'PkVar', SECURE_BOOT_GUIDS['PkVar'], True)
+    assert result['parse_ok'] is True
+    assert result['classification'] == 'Validated production PK'
+    assert result['evidence']['validated_pk'] is True
+    assert result['evidence']['ami_test_pk'] is False
+
+
+def test_pk_payload_recognition_does_not_bypass_full_donor_hash(tmp_path):
+    data = bytearray((ROOT / 'secureboot_donors' / 'PkVar.ffs').read_bytes())
+    # Change only the FFS state byte: the decompressed PK still matches, but
+    # a modified donor file must still fail its independent whole-file pin.
+    data[0x17] ^= 0x01
+    donor = tmp_path / 'PkVar.ffs'
+    donor.write_bytes(data)
+    with pytest.raises(ValueError, match='donor SHA-256 mismatch'):
+        inspect_donor_ffs(donor, 'PkVar')
 
 
 @pytest.mark.parametrize('name', STOCK_CORPUS)
@@ -340,3 +363,73 @@ def test_v15_selective_repair_restores_synthetic_rebuild_damage_across_corpus(na
         assert result['changed'] is True
         assert damaged.read_bytes() == stock.read_bytes()
         assert inspect_fit(damaged)['status'] == 'PASS'
+
+
+
+def test_v0962_xd3_problematic_top_pad_is_outside_secureboot_target_fv():
+    stock = available('x99xd3-260810-stock(1).ROM')
+    if stock is None: pytest.skip('compact XD3 reference ROM not supplied')
+    data = stock.read_bytes()
+    hit = find_ffs_by_guid(data, SECURE_BOOT_GUIDS['PkVar'])
+    assert len(hit) == 1
+    fv = find_enclosing_fv(data, hit[0].offset)
+    assert fv is not None
+    assert (fv.offset, fv.end) == (0x890000, 0xD90000)
+    # The real v0.961 hardware failure started at 0xFFD000, inside another FV.
+    # This offset must therefore never be accepted as part of a PkVar rebuild.
+    assert not (fv.offset <= 0xFFD000 < fv.end)
+    assert any(b not in (0x00, 0xFF) for b in data[0xFFD000:0xFFD020])
+
+
+def test_v0962_uefireplace_output_is_contained_to_target_fv(monkeypatch, tmp_path):
+    stock = available('v9s-260826.ROM')
+    rebuilt_reference = available('v9s-260826_SB2023_OPT_LOGO.ROM')
+    if stock is None or rebuilt_reference is None:
+        pytest.skip('V9S stock/final references not supplied')
+
+    source = tmp_path / 'input.rom'
+    source.write_bytes(stock.read_bytes())
+    output = tmp_path / 'output.rom'
+    donor = ROOT / 'secureboot_donors' / 'PkVar.ffs'
+
+    before = source.read_bytes()
+    old_hit = find_ffs_by_guid(before, SECURE_BOOT_GUIDS['PkVar'])
+    assert len(old_hit) == 1
+    target_fv = find_enclosing_fv(before, old_hit[0].offset)
+    assert target_fv is not None
+
+    raw_rebuild = rebuilt_reference.read_bytes()
+    # This fixture intentionally differs outside the Secure Boot target FV,
+    # standing in for UEFIReplace's unrelated non-empty pad-file destruction.
+    assert any(
+        a != b
+        for a, b in zip(before[target_fv.end:], raw_rebuild[target_fv.end:])
+    )
+
+    def fake_run_tool(args, cwd=None, timeout=300):
+        out = Path(args[args.index('-o') + 1])
+        out.write_bytes(raw_rebuild)
+        return subprocess.CompletedProcess(args, 0, 'parseFile: non-empty pad-file contents will be destroyed after volume modifications\nFile replaced\n', None)
+
+    monkeypatch.setattr(replacer_mod, 'run_tool', fake_run_tool)
+    result = replacer_mod.replace_ffs(
+        source,
+        donor,
+        output,
+        SECURE_BOOT_GUIDS['PkVar'],
+        tmp_path / 'UEFIReplace.exe',
+    )
+
+    accepted = output.read_bytes()
+    # Every byte outside the one validated target FV is restored from input.
+    assert accepted[:target_fv.offset] == before[:target_fv.offset]
+    assert accepted[target_fv.end:] == before[target_fv.end:]
+    assert result['fv_boundary']['external_changes_restored'] > 0
+
+    # The intended rebuilt FV is retained and the requested donor remains exact.
+    new_hit = find_ffs_by_guid(accepted, SECURE_BOOT_GUIDS['PkVar'])
+    assert len(new_hit) == 1
+    assert new_hit[0].data == donor.read_bytes()
+    new_fv = find_enclosing_fv(accepted, new_hit[0].offset)
+    assert new_fv is not None
+    assert (new_fv.offset, new_fv.end) == (target_fv.offset, target_fv.end)

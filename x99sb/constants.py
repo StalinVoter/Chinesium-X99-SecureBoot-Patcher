@@ -14,7 +14,6 @@ EFI_CERT_TYPE_PKCS7_GUID = "4AAFD29D-68DF-49EE-8AA9-347D375665A7"
 
 CERT_STRINGS = {
     "ami_test_pk": "DO NOT TRUST - AMI Test PK",
-    "asrock_pk": "ASRock Inc.",
     "kek_2011": "Microsoft Corporation KEK CA 2011",
     "kek_2023": "Microsoft Corporation KEK 2K CA 2023",
     "db_uefi_2011": "Microsoft Corporation UEFI CA 2011",
@@ -23,6 +22,9 @@ CERT_STRINGS = {
     "db_microsoft_2023": "Microsoft UEFI CA 2023",
     "db_optionrom_2023": "Microsoft Option ROM UEFI CA 2023",
 }
+
+# Exact decompressed payload identity used for generic PK recognition.
+VALIDATED_PK_PAYLOAD_SHA256 = "0ad9104d868b315b4b6d6c01a4b51451173f22fc3367cc0c2d482c0a3b1b2e9a"
 
 # Exact validated Secure Boot update payloads bundled with this build.
 BUNDLED_DONOR_SHA256 = {

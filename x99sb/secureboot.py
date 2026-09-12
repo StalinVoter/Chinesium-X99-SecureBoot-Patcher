@@ -16,6 +16,7 @@ from .constants import (
     EFI_CERT_TYPE_PKCS7_GUID,
     CERT_STRINGS,
     BUNDLED_DONOR_SHA256,
+    VALIDATED_PK_PAYLOAD_SHA256,
 )
 from .firmware import FfsFile, find_ffs_by_guid, parse_ffs_at
 
@@ -134,6 +135,9 @@ def inspect_var(name: str, ffs: FfsFile) -> SecureBootVar:
     decompressed, section = decompress_var_ffs(ffs)
     auth, lists = _parse_esls(decompressed)
     evidence = {key: _contains(decompressed, text) for key, text in CERT_STRINGS.items()}
+    evidence['validated_pk'] = (
+        name == 'PkVar' and sha256(decompressed).hexdigest() == VALIDATED_PK_PAYLOAD_SHA256
+    )
     return SecureBootVar(name, ffs, decompressed, section, auth, lists, evidence)
 
 
@@ -141,8 +145,8 @@ def _classify(name: str, evidence: dict[str, bool]) -> str:
     if name == 'PkVar':
         if evidence['ami_test_pk']:
             return 'AMI test PK'
-        if evidence['asrock_pk']:
-            return 'ASRock production PK'
+        if evidence['validated_pk']:
+            return 'Validated production PK'
         return 'Other / vendor PK'
     if name == 'KekVar':
         if evidence['kek_2023'] and evidence['kek_2011']:
@@ -262,8 +266,8 @@ def inspect_donor_ffs(path: Path, expected_name: str | None = None) -> dict[str,
     if name == 'PkVar':
         if evidence['ami_test_pk']:
             raise ValueError('donor PkVar contains AMI test PK')
-        if not evidence['asrock_pk']:
-            raise ValueError('donor PkVar does not contain the validated ASRock Inc. production PK')
+        if not evidence['validated_pk']:
+            raise ValueError('donor PkVar does not contain the validated production PK payload')
     elif name == 'KekVar' and not evidence['kek_2023']:
         raise ValueError('donor KekVar lacks Microsoft Corporation KEK 2K CA 2023')
     elif name == 'dbVar' and not (

@@ -1,23 +1,24 @@
-Chinesium X99 SecureBoot Patcher v0.9 — source completeness
-============================================================
-
-This repository contains the complete application source and the complete
-validated Secure Boot update payload set used by v0.9.
+Chinesium X99 SecureBoot Patcher v0.964 source completeness
+==========================================================
 
 Included:
-- GUI and CLI entry points;
-- all x99sb Python modules;
-- build/setup scripts;
-- full regression test source;
-- exact PK/KEK/db Secure Boot update FFS payloads;
-- UEFIReplace acquisition and hash-verification instructions.
+- complete Python GUI/CLI source;
+- Secure Boot parser/patch engine;
+- selective rebuild-metadata safeguard;
+- Intel FPT dump/flash/recovery integration source;
+- authoritative fpt_support\fparts.txt;
+- validated PK/KEK/db update payloads;
+- Windows setup/build scripts;
+- application-wide de-duplicated session logging and centralized build-report routing;
+- Secure Boot build progress tracker and GUI progress-bar integration;
+- stateful FPT read/erase/program/verify progress sequencing;
+- regression tests;
+- public README/release/validation documentation.
 
-Intentionally NOT redistributed:
-- UEFIReplace.exe
+Deliberately NOT redistributed:
+- UEFIReplace.exe 0.28.0;
+- fptw64.exe 9.1.10.1000;
+- pmxdll32e.DLL;
+- idrvdll32e.DLL.
 
-Obtain the exact required helper from the official LongSoft/UEFITool 0.28.0
-release and place it at tools\UEFIReplace.exe:
-https://github.com/LongSoft/UEFITool/releases/download/0.28.0/UEFIReplace_0.28.0_win32.zip
-
-Required SHA-256:
-ab05d53fcac19651818f4ee4505813b10badec7a10d141836fff3bba8964ed8b
+README.md and tools\README.txt identify the exact public sources and required hashes.

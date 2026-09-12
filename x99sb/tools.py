@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from .constants import UEFIREPLACE_SHA256, UEFIREPLACE_DOWNLOAD_URL
+from .sessionlog import log, log_block
 
 @dataclass(frozen=True)
 class ToolPaths:
@@ -41,11 +42,14 @@ def discover_uefireplace() -> Path | None:
 
 def validate_uefireplace(path: Path) -> None:
     digest = sha256_file(path)
+    log('TOOLS', f'UEFIReplace candidate: {path}')
+    log('TOOLS', f'UEFIReplace SHA-256: {digest}')
     if digest != UEFIREPLACE_SHA256:
         raise ValueError(
             'UEFIReplace.exe is not the required official 0.28.0 Windows binary: '
             f'{digest} != {UEFIREPLACE_SHA256}. Download the exact required build from {UEFIREPLACE_DOWNLOAD_URL}'
         )
+    log('TOOLS', 'UEFIReplace validation: PASS')
 
 
 def _decode(data: bytes) -> str:
@@ -57,6 +61,10 @@ def _decode(data: bytes) -> str:
 
 
 def run_tool(args: list[str], cwd: Path | None = None, timeout: int = 300) -> subprocess.CompletedProcess:
+    shown = subprocess.list2cmdline(args)
+    log('TOOL', f'Command: {shown}')
+    log('TOOL', f'Working directory: {cwd if cwd else Path.cwd()}')
+    log('TOOL', f'Timeout: {timeout}s')
     creationflags = 0
     startupinfo = None
     if os.name == 'nt':
@@ -78,5 +86,11 @@ def run_tool(args: list[str], cwd: Path | None = None, timeout: int = 300) -> su
     except subprocess.TimeoutExpired as exc:
         proc.kill()
         output, _ = proc.communicate()
-        raise subprocess.TimeoutExpired(args, timeout, output=_decode(output or b'')) from exc
-    return subprocess.CompletedProcess(args, proc.returncode, _decode(output or b''), None)
+        decoded = _decode(output or b'')
+        log_block('TOOL', 'stdout/stderr before timeout', decoded)
+        log('TOOL', f'Command timed out after {timeout}s')
+        raise subprocess.TimeoutExpired(args, timeout, output=decoded) from exc
+    decoded = _decode(output or b'')
+    log('TOOL', f'Exit code: {proc.returncode}')
+    log_block('TOOL', 'stdout/stderr', decoded)
+    return subprocess.CompletedProcess(args, proc.returncode, decoded, None)

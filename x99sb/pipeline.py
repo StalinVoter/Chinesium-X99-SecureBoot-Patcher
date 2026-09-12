@@ -19,6 +19,7 @@ from .secureboot import (
     secureboot_ffs_hashes,
 )
 from .tools import app_directory, discover_uefireplace, validate_uefireplace
+from .sessionlog import logs_directory, log, log_json
 
 Progress = Callable[[str, str], None]
 
@@ -47,20 +48,25 @@ def default_output(source: Path) -> Path:
 
 
 def inspect_rom(path: Path) -> dict[str, Any]:
+    path = path.resolve()
+    log('ROM', f'Inspecting ROM: {path}')
     sb = inspect_secure_boot(path)
     fit = inspect_fit(path)
-    return {
+    report = {
         'path': str(path),
         'size': path.stat().st_size,
         'sha256': sha256_file(path),
         'secure_boot': sb,
         'fit': fit,
     }
+    log_json('ROM', 'ROM inspection result', report)
+    return report
 
 
 def _log_step(steps: list[dict[str, Any]], progress: Progress | None, state: str, text: str) -> None:
     item = {'time': datetime.now().isoformat(timespec='seconds'), 'state': state, 'text': text}
     steps.append(item)
+    log('BUILD', f'[{state}] {text}')
     if progress:
         progress(state, text)
 
@@ -78,6 +84,8 @@ def build_secureboot_rom(source: Path, output: Path, progress: Progress | None =
     input_hash = sha256_file(source)
     input_size = source.stat().st_size
     result: BuildResult | None = None
+    log('BUILD', f'Secure Boot build requested: input={source} output={output}')
+    log('BUILD', f'Input size={input_size} SHA-256={input_hash}')
 
     try:
         if source == output:
@@ -98,6 +106,7 @@ def build_secureboot_rom(source: Path, output: Path, progress: Progress | None =
             raise FileNotFoundError('UEFIReplace.exe 0.28.0 is required. Download the official Windows archive from https://github.com/LongSoft/UEFITool/releases/download/0.28.0/UEFIReplace_0.28.0_win32.zip, then place UEFIReplace.exe in the tools folder.')
         validate_uefireplace(tool)
         plan = plan_secure_boot(initial_sb, donors)
+        log_json('BUILD', 'Secure Boot patch plan', plan)
         patches = [x for x in plan if x['action'] == 'PATCH']
         if not patches:
             raise ValueError('This ROM already has the desired Secure Boot 2023 defaults; no output ROM is needed.')
@@ -192,15 +201,22 @@ def build_secureboot_rom(source: Path, output: Path, progress: Progress | None =
             f'{type(exc).__name__}: {exc}',
         )
 
+    log_json('BUILD', 'Secure Boot build summary', {
+        'success': result.success,
+        'output_sha256': result.output_sha256,
+        'error': result.error,
+    })
     write_reports(result)
     return result
 
 
 def _report_paths(output: Path) -> tuple[Path, Path, Path]:
+    root = logs_directory()
+    base = output.name
     return (
-        output.with_suffix(output.suffix + '.build.log'),
-        output.with_suffix(output.suffix + '.report.txt'),
-        output.with_suffix(output.suffix + '.report.json'),
+        root / f'{base}.build.log',
+        root / f'{base}.report.txt',
+        root / f'{base}.report.json',
     )
 
 
@@ -232,4 +248,10 @@ def write_reports(result: BuildResult) -> None:
     if result.error:
         lines += ['', 'ERROR:', result.error]
     txt_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    log_path.write_text('\n'.join(f"{x['time']} [{x['state']}] {x['text']}" for x in result.steps) + ('\n' if result.steps else ''), encoding='utf-8')
+    log_lines = [f"{x['time']} [{x['state']}] {x['text']}" for x in result.steps]
+    if result.error:
+        log_lines += [f"{datetime.now().isoformat(timespec='seconds')} [ERROR] {result.error}"]
+    log_path.write_text('\n'.join(log_lines) + ('\n' if log_lines else ''), encoding='utf-8')
+    log('BUILD', f'Wrote build log: {log_path}')
+    log('BUILD', f'Wrote text report: {txt_path}')
+    log('BUILD', f'Wrote JSON report: {json_path}')

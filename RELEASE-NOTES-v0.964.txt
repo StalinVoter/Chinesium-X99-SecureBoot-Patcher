@@ -1,0 +1,21 @@
+Chinesium X99 SecureBoot Patcher v0.964
+=======================================
+
+v0.964 fixes FPT flash progress-bar phase tracking discovered during the first
+successful hardware flash of the contained-rebuild SB2023 image.
+
+Changed in v0.964
+-----------------
+- FPT bracketed addresses are now treated correctly as moving cursor addresses
+  for read, erase, program and verify progress.
+- A continuous erase pass now uses one 0-100% bar instead of creating one bar
+  per changing erase address.
+- A continuous program pass likewise uses one 0-100% bar.
+- Read and verify remain one bar per pass.
+- If FPT starts a second erase/program pass and its percentage resets, the GUI
+  creates a second pass bar rather than making the first bar jump backwards.
+- Raw FPT output is unchanged and remains fully logged.
+
+Firmware modification, contained UEFIReplace handling, dump validation,
+verified dual backups, flash verification and automatic recovery behavior are
+unchanged from v0.963.
