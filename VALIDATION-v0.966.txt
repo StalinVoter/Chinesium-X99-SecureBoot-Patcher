@@ -1,0 +1,61 @@
+Chinesium X99 SecureBoot Patcher v0.966 — validation
+
+Based on the corrected v0.965 source. Authoring environment: Linux/Python 3.12,
+PySide6 Essentials/Shiboken 6.10.3, PowerShell 7.4.6.
+
+Executed:
+- Full suite with both supplied XD3 stock ROM reference fixtures:
+  117 passed, 20 skipped. Optional absent board/reference-tool/native-corpus
+  fixtures account for the remaining skips.
+- Live HTTPS downloads through the production installer of all four files:
+  UEFIReplace.exe, fptw64.exe, pmxdll32e.DLL and idrvdll32e.DLL. All four
+  installed and passed exact size/SHA-256 inventory checks. The UEFIReplace
+  release ZIP hash and executable hash were checked independently.
+- GUI button tests run the real Qt worker/thread path, verify installation,
+  refreshed status and a follow-up FPT check; failed verification preserves
+  the previous file and permits retry. The FPT check itself is mocked in
+  GUI tests so no hardware operation is attempted.
+- Inventory/download cases cover missing/wrong files, same-size wrong bytes,
+  directory collisions, HTML/empty/oversized downloads, network failures,
+  locked destinations, temporary-file cleanup and archive path rejection.
+- FPT rejects incorrect companion DLLs before hardware access.
+- Actual Qt file-drop events on both the production opening panel and main
+  window reach ROM loading, including filenames with spaces and non-ASCII
+  characters. Invalid URL/directory/multiple-file drops are rejected.
+- The production runtime self-test constructs the full GUI in diagnostic
+  mode and completes its file-drop checks on Linux's offscreen platform.
+  It correctly refuses to report overall Windows-platform success there.
+- Helper command/transport tests cover the companion CLI location, streamed
+  partial JSON events, original user backup location, cancelled elevation,
+  and dispatch of a complete mocked flash/backup/recovery workflow.
+- PyInstaller's pinned manifest generator produces asInvoker for this spec.
+  Finished Windows EXE resource manifests and packaged GUI drop routing are
+  mandatory validation gates in the Windows build/release packager.
+- PowerShell syntax/startup regression checks and Python compilation passed.
+- Firmware parser, replacement containment, Secure Boot payload processing,
+  pipeline and FIT modules remain byte-identical to v0.965.
+
+Not executed here:
+- Windows EXE compilation, Windows Explorer OLE drag-and-drop, Windows UAC
+  helper launch, or the actual packaged GUI/CLI/conflicting-DLL launches.
+- A hardware BIOS probe, dump or flash, or Windows Sandbox launch.
+
+The Windows builder runs the source suite, validates actual EXE native bytes
+and asInvoker manifests, then requires GUI/CLI/conflicting-DLL tests including
+real packaged GUI file-drop routing before creating the Windows release ZIP.
+Explorer/UAC integration still needs verification on Windows. Source Qt event
+checks and mocked helper tests are not a claim of Windows integration testing.
+
+Live download sources checked on 2026-10-22:
+UEFIReplace: official LongSoft/UEFITool 0.28.0 Windows release archive.
+FPT: CE1CECL/IntelCSTools mirror, fixed commit
+698d2f69d952e36dbb20ac41d3fa858c2947168e.
+Exact installed hashes are pinned in x99sb/constants.py; archive size/hash
+and per-file byte sizes are pinned in x99sb/tool_inventory.py.
+
+Generated-ROM confirmation follow-up:
+Verified exact original first-dialog text and exact user-supplied second-dialog
+text through the real MainWindow completion method. Four mocked consent and
+readiness paths confirm no flash dispatch after either No choice or failed
+readiness. Rendered the second dialog in offscreen Qt; Python compilation and
+the 10 existing GUI-download/drag-drop tests passed. No BIOS access performed.

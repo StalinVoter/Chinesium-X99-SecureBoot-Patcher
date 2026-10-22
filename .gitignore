@@ -4,6 +4,9 @@ __pycache__/
 build/
 dist/
 *.spec
+!patcher.spec
+.build-venv/
+Chinesium-X99-SecureBoot-Patcher-*-Windows-x64.zip*
 setup-build-X99-Secureboot-patcher.log
 *.report.txt
 *.report.json

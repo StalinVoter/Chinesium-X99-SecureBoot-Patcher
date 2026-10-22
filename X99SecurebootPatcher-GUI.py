@@ -1,2 +1,2 @@
-from x99sb.gui import main
-raise SystemExit(main())
+from x99sb.runtime_bootstrap import run
+raise SystemExit(run('gui'))

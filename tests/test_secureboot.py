@@ -33,7 +33,9 @@ def available(name: str) -> Path | None:
 
 
 def test_uefireplace_is_external_and_exact_version_is_pinned():
-    assert not (ROOT / 'tools' / 'UEFIReplace.exe').exists()
+    # A user's build checkout may contain their external tool. The public ZIP
+    # exclusion is enforced by the release-packaging tests, not this checkout.
+    assert 'tools/UEFIReplace.exe' in (ROOT / '.gitignore').read_text()
     assert UEFIREPLACE_SHA256 == 'ab05d53fcac19651818f4ee4505813b10badec7a10d141836fff3bba8964ed8b'
     assert UEFIREPLACE_DOWNLOAD_URL == 'https://github.com/LongSoft/UEFITool/releases/download/0.28.0/UEFIReplace_0.28.0_win32.zip'
     instructions = (ROOT / 'tools' / 'README.txt').read_text(encoding='utf-8')

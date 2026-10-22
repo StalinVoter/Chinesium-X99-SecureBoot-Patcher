@@ -9,6 +9,7 @@ import sys
 
 from .constants import UEFIREPLACE_SHA256, UEFIREPLACE_DOWNLOAD_URL
 from .sessionlog import log, log_block
+from .nativeprocess import popen
 
 @dataclass(frozen=True)
 class ToolPaths:
@@ -31,13 +32,8 @@ def sha256_file(path: Path) -> str:
 
 
 def discover_uefireplace() -> Path | None:
-    base = app_directory()
-    source = Path(__file__).resolve().parent.parent
-    for folder in (base / 'tools', base, source / 'tools', source):
-        p = folder / 'UEFIReplace.exe'
-        if p.is_file():
-            return p.resolve()
-    return None
+    p = app_directory() / 'tools' / 'UEFIReplace.exe'
+    return p.resolve() if p.is_file() else None
 
 
 def validate_uefireplace(path: Path) -> None:
@@ -72,7 +68,7 @@ def run_tool(args: list[str], cwd: Path | None = None, timeout: int = 300) -> su
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = subprocess.SW_HIDE
-    proc = subprocess.Popen(
+    proc = popen(
         args,
         cwd=str(cwd) if cwd else None,
         stdout=subprocess.PIPE,

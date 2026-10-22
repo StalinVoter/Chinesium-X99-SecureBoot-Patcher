@@ -11,6 +11,13 @@ from x99sb import fpt
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def local_fpt_unit_tests(monkeypatch):
+    # These tests mock BIOS operations and exercise their local implementation.
+    # Windows unit tests must never request UAC or invoke a real helper.
+    monkeypatch.setattr(fpt, 'needs_elevation', lambda: False)
+
+
 def test_v0961_pins_exact_fpt_and_authoritative_fparts():
     assert fpt.FPT_VERSION == '9.1.10.1000'
     assert fpt.FPT_SHA256 == 'b7e942e903f5f6bba84c3e9294edc8cc097c1173ca249a41a4cca1ab9e15a697'
@@ -19,10 +26,13 @@ def test_v0961_pins_exact_fpt_and_authoritative_fparts():
     assert fpt.sha256_file(ROOT / 'fpt_support' / 'fparts.txt') == fpt.FPARTS_SHA256
 
 
-def test_external_fpt_is_not_redistributed_in_source_tree():
-    assert not (ROOT / 'tools' / 'fptw64.exe').exists()
-    assert not (ROOT / 'tools' / 'pmxdll32e.DLL').exists()
-    assert not (ROOT / 'tools' / 'idrvdll32e.DLL').exists()
+def test_external_fpt_is_ignored_and_download_is_documented():
+    # Users may install the external tools in their build checkout. Check
+    # source-control exclusions here; public ZIP contents are checked by
+    # test_release_package.py with external tools present.
+    ignored = (ROOT / '.gitignore').read_text(encoding='utf-8').splitlines()
+    for name in ('fptw64.exe', 'pmxdll32e.DLL', 'idrvdll32e.DLL'):
+        assert f'tools/{name}' in ignored
     text = (ROOT / 'tools' / 'README.txt').read_text(encoding='utf-8')
     assert fpt.FPT_SOURCE_FOLDER_URL in text
     assert fpt.FPT_SHA256 in text
@@ -189,10 +199,11 @@ def test_gui_contains_dump_flash_progress_and_no_fit_wording():
 
 def test_build_copies_fpt_dependencies_and_authoritative_fparts_and_requests_uac():
     text = (ROOT / 'build_exe.bat').read_text(encoding='utf-8')
-    assert '--uac-admin' in text
-    assert 'tools\\fptw64.exe' in text
-    assert 'tools\\pmxdll32e.DLL' in text
-    assert 'tools\\idrvdll32e.DLL' in text
+    spec = (ROOT / 'patcher.spec').read_text(encoding='utf-8')
+    assert 'uac_admin=False' in spec
+    assert 'fptw64.exe' in text
+    assert 'pmxdll32e.DLL' in text
+    assert 'idrvdll32e.DLL' in text
     assert 'fpt_support\\fparts.txt' in text
     assert 'dist\\tools\\fparts.txt' in text
 

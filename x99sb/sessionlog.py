@@ -26,7 +26,17 @@ def _app_directory() -> Path:
 
 def logs_directory() -> Path:
     path = _app_directory() / 'LOGS'
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        # A directory may exist but be read-only (for example in a Sandbox map).
+        import tempfile
+        with tempfile.TemporaryFile(dir=path):
+            pass
+    except OSError:
+        import tempfile
+        base = Path(os.environ.get('LOCALAPPDATA') or tempfile.gettempdir())
+        path = base / 'X99-SecureBoot-Patcher' / 'LOGS'
+        path.mkdir(parents=True, exist_ok=True)
     return path
 
 

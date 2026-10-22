@@ -1,0 +1,32 @@
+Chinesium X99 SecureBoot Patcher v0.965
+
+- Python 3.13.14 x64 and all build packages pinned; package wheel SHA-256 hashes locked.
+- One canonical Microsoft C/C++ runtime set from the official pinned Shiboken wheel.
+- Build-time PE architecture, import, delay-import and export verification.
+- Runtime manifest covers the native files actually collected for each EXE.
+- First custom runtime hook validates files before installed Qt runtime hooks.
+- Restricted private DLL search paths and dependency-ordered absolute-path loads.
+- Loaded native-module paths and Qt/PySide/Shiboken versions checked.
+- Logging starts before Qt imports; native startup errors include the log path.
+- External FPT, PowerShell and UEFIReplace launches avoid inheriting Qt DLL paths.
+- Actual packaged GUI, CLI and conflicting-DLL self-tests required before ZIP creation.
+- Finished EXE CArchive DLL bytes verified against the manifest.
+- Automatic tool-free Windows release ZIP and SHA-256 file.
+- Optional offline Windows Sandbox runner for the same packaged self-tests.
+
+This source revision has not been built or executed on Windows in the authoring
+runtime. See VALIDATION-v0.965.txt for the checks actually run. The Windows build
+will stop if its mandatory packaged EXE tests fail.
+
+Build-folder correction:
+The source test suite now permits user-supplied FPT files in tools/, as the
+Windows builder already supports. Public release ZIP exclusions are tested
+against a fixture containing the external tools in both source and dist.
+For an existing v0.965 build environment, replace these source files and run
+build_exe.bat; installing the pinned dependencies again is unnecessary.
+
+Windows PowerShell startup correction:
+Resolve the runtime test paths after parameter binding, and pass explicit
+absolute paths from build_exe.bat. This removes the PowerShell 5.1 -File
+parameter-default failure. RESUME-PACKAGING.cmd resumes from already compiled
+EXEs after this failure; it still requires the real packaged tests to pass.

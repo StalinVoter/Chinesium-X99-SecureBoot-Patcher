@@ -1,4 +1,4 @@
-External tools required by Chinesium X99 SecureBoot Patcher v0.964
+External tools required by Chinesium X99 SecureBoot Patcher v0.966
 ================================================================
 
 1) UEFIReplace 0.28.0
@@ -22,7 +22,7 @@ ab05d53fcac19651818f4ee4505813b10badec7a10d141836fff3bba8964ed8b
 Intel FPT is required for the Dump BIOS and Flash BIOS functions and is NOT redistributed by this project.
 
 Verified public source containing the exact files:
-https://github.com/CE1CECL/IntelCSTools/tree/ce1cecl/ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64
+https://github.com/CE1CECL/IntelCSTools/tree/698d2f69d952e36dbb20ac41d3fa858c2947168e/ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64
 
 Copy these files from that WIN64 folder into tools\:
   fptw64.exe
@@ -33,3 +33,8 @@ Required SHA-256 of fptw64.exe:
 b7e942e903f5f6bba84c3e9294edc8cc097c1173ca249a41a4cca1ab9e15a697
 
 You do NOT need to preserve the fparts.txt supplied with Intel FPT. The application ships its own validated/extended fparts.txt and unconditionally overwrites tools\fparts.txt with that exact file before every FPT compatibility probe, BIOS dump and BIOS flash operation.
+
+GUI users can use Required tools → Download this file to install or repair
+each external file directly. All four files are checked against exact SHA-256
+hashes. The application downloads UEFIReplace from its official release ZIP
+and FPT files from the pinned repository revision linked above.

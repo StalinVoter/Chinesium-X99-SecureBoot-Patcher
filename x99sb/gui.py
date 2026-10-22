@@ -26,10 +26,18 @@ from .pipeline import inspect_rom, build_secureboot_rom, default_output
 from .buildprogress import BuildProgressTracker
 from .secureboot import load_bundled_donors
 from .tools import app_directory, discover_uefireplace, validate_uefireplace, sha256_file
+from .tool_inventory import TOOL_SPECS, scan_tools, install_tool
 from .sessionlog import start_session_log, finish_session_log, install_exception_hook, log
 from . import __version__
 
 APP_TITLE = 'X99 Secureboot patcher'
+
+FLASH_CONFIRMATION_TEXT = (
+    "Please note: Flashing a Secure Boot-patched ROM dumped from this motherboard's own working BIOS is generally very low-risk. That being said, no BIOS flash is risk-free.\n\n"
+    'However, interrupting BIOS erasing or programming WILL . BRICK . YOUR . MOTHERBOARD.\n'
+    'Do NOT power off, restart, disconnect power or force-close the flashing process until the operation has finished, including any automatic recovery. An incomplete write can leave the motherboard unable to boot and may require an external programmer to recover.\n\n'
+    'If you are sure that you understand this, click "Yes" to proceed'
+)
 
 STYLE = r'''
 QMainWindow { background: #f4f5f7; }
@@ -93,6 +101,17 @@ def _choose_dump_output(parent: QWidget) -> str | None:
     return files[0] if files else None
 
 
+def _dropped_file(event) -> str | None:
+    mime = event.mimeData()
+    if not mime.hasUrls():
+        return None
+    urls = mime.urls()
+    if len(urls) != 1 or not urls[0].isLocalFile():
+        return None
+    path = Path(urls[0].toLocalFile())
+    return str(path) if path.is_file() else None
+
+
 class DropPanel(QFrame):
     fileDropped = Signal(str)
 
@@ -122,14 +141,21 @@ class DropPanel(QFrame):
             self.fileDropped.emit(path)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls() and len(event.mimeData().urls()) == 1:
+        if _dropped_file(event):
             event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
 
     def dropEvent(self, event: QDropEvent):
-        urls = event.mimeData().urls()
-        if urls:
-            self.fileDropped.emit(urls[0].toLocalFile())
+        path = _dropped_file(event)
+        if path:
+            self.fileDropped.emit(path)
             event.acceptProposedAction()
+        else:
+            event.ignore()
 
 
 class BuildWorker(QObject):
@@ -154,7 +180,29 @@ class FptProbeWorker(QObject):
     finished = Signal(object)
 
     def run(self):
-        self.finished.emit(probe_fpt())
+        try:
+            result = probe_fpt()
+        except Exception as exc:
+            log('FPT PREFLIGHT', f'Compatibility check failed: {type(exc).__name__}: {exc}')
+            result = {'ready': False, 'reason': 'probe-exception', 'message': str(exc)}
+        self.finished.emit(result)
+
+
+class ToolDownloadWorker(QObject):
+    progress = Signal(str)
+    finished = Signal(object)
+
+    def __init__(self, name: str):
+        super().__init__()
+        self.name = name
+
+    def run(self):
+        try:
+            path = install_tool(self.name, progress=self.progress.emit)
+            result = {'success': True, 'name': self.name, 'path': str(path)}
+        except Exception as exc:
+            result = {'success': False, 'name': self.name, 'error': str(exc)}
+        self.finished.emit(result)
 
 
 class FptWorker(QObject):
@@ -302,13 +350,13 @@ class FptOperationDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, *, runtime_check: bool = False):
         super().__init__()
         log('GUI', 'Constructing main window')
         self.setWindowTitle(APP_TITLE)
         self.resize(960, 780)
         self.setMinimumSize(800, 650)
-        self.setAcceptDrops(False)
+        self.setAcceptDrops(True)
         self.rom_path: Path | None = None
         self.report: dict | None = None
         self.last_built_rom: Path | None = None
@@ -318,10 +366,128 @@ class MainWindow(QMainWindow):
         self.probe_worker: FptProbeWorker | None = None
         self.fpt_probe: dict | None = None
         self.fpt_status_labels: list[QLabel] = []
+        self.tool_rows: dict = {}
+        self.download_thread: QThread | None = None
+        self.download_worker: ToolDownloadWorker | None = None
+        self._download_running = False
+        self._probe_running = False
+        self._patch_running = False
+        self._download_result: dict | None = None
+        self._download_name = ''
         self._make_ui()
         self.setStyleSheet(STYLE)
-        self._tool_preflight()
+        self._refresh_tools()
+        if not runtime_check:
+            self._tool_preflight()
+            self._start_fpt_probe()
+
+    def _make_tools_card(self) -> QFrame:
+        card = QFrame(); card.setObjectName('card')
+        layout = QVBoxLayout(card); layout.setContentsMargins(16, 12, 16, 12)
+        top = QHBoxLayout()
+        title = QLabel('Required tools'); title.setStyleSheet('font-weight:650;font-size:11.5pt;')
+        top.addWidget(title); top.addStretch()
+        self.recheck_tools_btn = QPushButton('Recheck files')
+        self.recheck_tools_btn.clicked.connect(self._recheck_tools)
+        top.addWidget(self.recheck_tools_btn); layout.addLayout(top)
+        folder = QLabel('Tools folder: ' + str(app_directory() / 'tools'))
+        folder.setWordWrap(True); folder.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        layout.addWidget(folder)
+        grid = QGridLayout()
+        for row, spec in enumerate(TOOL_SPECS):
+            label = QLabel(f'{spec.name} ({spec.version})')
+            status = QLabel('Checking…'); status.setWordWrap(True)
+            button = QPushButton('Download this file')
+            button.clicked.connect(lambda checked=False, name=spec.name: self._download_tool(name))
+            grid.addWidget(label, row, 0); grid.addWidget(status, row, 1); grid.addWidget(button, row, 2)
+            self.tool_rows[spec.name] = (status, button)
+        grid.setColumnStretch(1, 1); layout.addLayout(grid)
+        self.tool_download_status = QLabel('Checks exact required files. Downloads are verified before installation.')
+        self.tool_download_status.setWordWrap(True); layout.addWidget(self.tool_download_status)
+        return card
+
+    def _refresh_tools(self):
+        busy = self._download_running or self._probe_running or self._patch_running
+        for item in scan_tools():
+            label, button = self.tool_rows[item['name']]
+            ready = item['state'] == 'ready'
+            label.setText('Ready' if ready else item['detail'])
+            label.setStyleSheet('color:#246b38;' if ready else 'color:#9a2929;')
+            button.setText('Installed' if ready else 'Download this file')
+            button.setEnabled(not ready and not busy)
+        self.recheck_tools_btn.setEnabled(not busy)
+
+    def _recheck_tools(self):
+        if self._download_running or self._probe_running or self._patch_running:
+            return
+        self._refresh_tools()
         self._start_fpt_probe()
+
+    def _download_tool(self, name: str):
+        if self._download_running or self._probe_running or self._patch_running:
+            return
+        self._download_running = True
+        self._download_name = name
+        self._download_result = None
+        self.tool_download_status.setText(f'{name}: downloading…')
+        self._refresh_tools()
+        self.download_thread = QThread(self)
+        self.download_worker = ToolDownloadWorker(name)
+        self.download_worker.moveToThread(self.download_thread)
+        self.download_thread.started.connect(self.download_worker.run)
+        self.download_worker.progress.connect(self._tool_download_progress)
+        self.download_worker.finished.connect(self._tool_download_finished)
+        self.download_worker.finished.connect(self.download_thread.quit)
+        self.download_worker.finished.connect(self.download_worker.deleteLater)
+        self.download_thread.finished.connect(self._tool_download_stopped)
+        self.download_thread.finished.connect(self.download_thread.deleteLater)
+        self.download_thread.start()
+
+    def _tool_download_progress(self, message: str):
+        self.tool_download_status.setText(f'{self._download_name}: {message}')
+
+    def _tool_download_finished(self, result: dict):
+        self._download_result = result
+
+    def _tool_download_stopped(self):
+        self.download_thread = None
+        self.download_worker = None
+        self._download_running = False
+        result = self._download_result or {'success': False, 'error': 'Download did not return a result.'}
+        self._refresh_tools()
+        if result['success']:
+            self.tool_download_status.setText(f"{result['name']}: installed and verified.")
+            if result['name'] != 'UEFIReplace.exe':
+                self.fpt_probe = None
+                self._update_fpt_status_labels()
+                self._start_fpt_probe()
+        else:
+            self.tool_download_status.setText(f"{self._download_name}: download failed. You can retry.")
+            QMessageBox.warning(self, 'Tool download failed', result['error'])
+
+    def closeEvent(self, event):
+        if self._download_running or self._probe_running or self._patch_running:
+            QMessageBox.information(self, 'Operation in progress', 'Wait for the current download, compatibility check or ROM operation to finish before closing the application.')
+            event.ignore()
+            return
+        super().closeEvent(event)
+
+    def dragEnterEvent(self, event):
+        if not self._patch_running and _dropped_file(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        path = _dropped_file(event)
+        if path and not self._patch_running:
+            self.load_rom(path)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def _make_bios_access_card(self) -> QFrame:
         card = QFrame(); card.setObjectName('card')
@@ -345,6 +511,7 @@ class MainWindow(QMainWindow):
         subtitle = QLabel('Update outdated Secure Boot factory certificates in AMI X99 BIOS ROMs.')
         subtitle.setObjectName('subtitle')
         outer.addWidget(title); outer.addWidget(subtitle)
+        outer.addWidget(self._make_tools_card())
 
         self.stack = QStackedWidget(); outer.addWidget(self.stack, 1)
         self.open_page = QWidget(); op = QVBoxLayout(self.open_page); op.setContentsMargins(0, 4, 0, 0); op.setSpacing(12)
@@ -379,6 +546,7 @@ class MainWindow(QMainWindow):
         outcard = QFrame(); outcard.setObjectName('card'); ol = QGridLayout(outcard); ol.setContentsMargins(16, 14, 16, 14)
         ol.addWidget(QLabel('Output ROM'), 0, 0)
         self.output_edit = QLineEdit(); ol.addWidget(self.output_edit, 0, 1)
+        self.output_edit.setAcceptDrops(False)
         self.output_browse_btn = QPushButton('Browse…'); self.output_browse_btn.setCursor(Qt.CursorShape.PointingHandCursor); self.output_browse_btn.clicked.connect(self._browse_output)
         ol.addWidget(self.output_browse_btn, 0, 2)
         self.build_btn = QPushButton('Create Secure Boot-patched ROM'); self.build_btn.setObjectName('primary'); self.build_btn.setCursor(Qt.CursorShape.PointingHandCursor); self.build_btn.clicked.connect(self.start_build)
@@ -404,7 +572,11 @@ class MainWindow(QMainWindow):
         try:
             tool = discover_uefireplace()
             if tool is not None:
-                validate_uefireplace(tool)
+                try:
+                    validate_uefireplace(tool)
+                except (ValueError, OSError) as exc:
+                    # The visible Required tools row provides its repair action.
+                    log('PREFLIGHT', f'UEFIReplace needs download/repair: {exc}')
             else:
                 log('PREFLIGHT', 'UEFIReplace.exe not found')
             donors = load_bundled_donors(app_directory())
@@ -416,15 +588,26 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, 'Patcher files problem', f'The Secure Boot patcher files did not pass self-check:\n\n{exc}')
 
     def _start_fpt_probe(self):
+        if self._probe_running:
+            return
+        self._probe_running = True
+        self._refresh_tools()
         log('GUI', 'Starting background FPT compatibility probe')
         self.probe_thread = QThread(self)
         self.probe_worker = FptProbeWorker(); self.probe_worker.moveToThread(self.probe_thread)
         self.probe_thread.started.connect(self.probe_worker.run)
         self.probe_worker.finished.connect(self._fpt_probe_finished)
         self.probe_worker.finished.connect(self.probe_thread.quit)
-        self.probe_thread.finished.connect(self.probe_worker.deleteLater)
+        self.probe_worker.finished.connect(self.probe_worker.deleteLater)
+        self.probe_thread.finished.connect(self._fpt_probe_stopped)
         self.probe_thread.finished.connect(self.probe_thread.deleteLater)
         self.probe_thread.start()
+
+    def _fpt_probe_stopped(self):
+        self._probe_running = False
+        self.probe_thread = None
+        self.probe_worker = None
+        self._refresh_tools()
 
     def _fpt_probe_finished(self, result: dict):
         self.fpt_probe = result
@@ -440,7 +623,7 @@ class MainWindow(QMainWindow):
             text = ('✕ BIOS dump and flash are unavailable because Windows Memory Integrity is active and Intel FPT cannot access the flash. '
                     'Open Windows Security → Device security → Core isolation details → Memory integrity, turn it Off, then restart Windows.')
             css = 'color:#9a2929;font-weight:600;'
-        elif self.fpt_probe.get('reason') in ('missing-files', 'wrong-fpt-version', 'missing-authoritative-fparts', 'wrong-authoritative-fparts'):
+        elif self.fpt_probe.get('reason') in ('missing-files', 'wrong-fpt-version', 'wrong-fpt-dependency', 'missing-authoritative-fparts', 'wrong-authoritative-fparts'):
             text = 'BIOS dump/flash setup is incomplete. ' + self.fpt_probe.get('message', '')
             css = 'color:#795600;font-weight:600;'
         else:
@@ -450,6 +633,9 @@ class MainWindow(QMainWindow):
             label.setText(text); label.setStyleSheet(css)
 
     def _ensure_fpt_ready(self) -> bool:
+        if self._download_running:
+            QMessageBox.information(self, 'Download in progress', 'Wait for the tool download and verification to finish.')
+            return False
         log('GUI', 'Checking whether BIOS dump/flash action may proceed')
         local = validate_fpt_installation()
         if not local.get('ready'):
@@ -537,6 +723,9 @@ class MainWindow(QMainWindow):
             self.load_rom(path)
 
     def load_rom(self, path: str):
+        if self._patch_running:
+            log('GUI', 'ROM change ignored while patching is in progress')
+            return
         p = Path(path)
         log('GUI', f'ROM load requested: {p}')
         if not p.is_file():
@@ -618,6 +807,9 @@ class MainWindow(QMainWindow):
                 log('GUI', f'Patched-ROM output path selected: {files[0]}')
 
     def start_build(self):
+        if self._download_running:
+            QMessageBox.information(self, 'Download in progress', 'Wait for the tool download and verification to finish.')
+            return
         log('GUI', 'User selected Create Secure Boot-patched ROM')
         if not self.rom_path or not self.report:
             log('GUI', 'Build ignored because no ROM/report is loaded')
@@ -636,6 +828,8 @@ class MainWindow(QMainWindow):
         if out.resolve() == self.rom_path.resolve():
             QMessageBox.warning(self,'Output must be new','The patcher never overwrites the input ROM. Choose a different output file.'); return
         log('GUI', f'Starting Secure Boot build: input={self.rom_path} output={out.resolve()}')
+        self._patch_running = True
+        self._refresh_tools()
         self.progress_card.show(); self.log.clear(); self.progress_label.setText('Starting…'); self.progress_label.setStyleSheet(''); self.build_progress.setValue(0); self.build_progress.setFormat('%p%'); self.build_progress.setStyleSheet(''); self.build_btn.setEnabled(False)
         targets = list(sb.get('recommended_targets', []))
         self.thread = QThread(self); self.worker = BuildWorker(self.rom_path, out, targets); self.worker.moveToThread(self.thread)
@@ -649,6 +843,8 @@ class MainWindow(QMainWindow):
         self.log.append(f'[{state}] {text}')
 
     def _finished(self,result):
+        self._patch_running = False
+        self._refresh_tools()
         if result.success:
             self.last_built_rom = Path(result.output_path).resolve()
             self.build_progress.setValue(100)
@@ -662,16 +858,14 @@ class MainWindow(QMainWindow):
             )
             if answer == QMessageBox.StandardButton.Yes:
                 # Select the freshly created ROM without asking the user to find it again.
-                if self._ensure_fpt_ready():
+                confirm = QMessageBox.warning(
+                    self, 'Confirm BIOS flash', FLASH_CONFIRMATION_TEXT,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if confirm == QMessageBox.StandardButton.Yes and self._ensure_fpt_ready():
                     target = self.last_built_rom
-                    confirm = QMessageBox.warning(
-                        self, 'Confirm BIOS flash',
-                        f'You are about to flash:\n\n{target}\n\nTwo independent pre-flash BIOS dumps will be created and verified before any erase/programming begins. Continue?',
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No,
-                    )
-                    if confirm == QMessageBox.StandardButton.Yes:
-                        dlg = FptOperationDialog(self, 'flash', target); dlg.exec()
+                    dlg = FptOperationDialog(self, 'flash', target); dlg.exec()
         else:
             self.progress_label.setText('✕ Build failed safely — no successful output was accepted.')
             self.progress_label.setStyleSheet('color:#9a2929;font-weight:650;')
@@ -685,6 +879,8 @@ def main() -> int:
     install_exception_hook()
     log('SESSION', f'GUI entrypoint arguments: {sys.argv!r}')
     app = QApplication(sys.argv)
+    from .runtime_bootstrap import audit_loaded
+    audit_loaded()
     app.setApplicationName(APP_TITLE)
     app.aboutToQuit.connect(lambda: finish_session_log('Qt application exit'))
     win = MainWindow(); win.show()

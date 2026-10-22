@@ -1,0 +1,77 @@
+Chinesium X99 SecureBoot Patcher v0.965 — source validation
+
+Baseline: repository tag v0.964, commit cc015969d1e5e2db626c077588438e0a108c93e7.
+Authoring environment: Linux, Python 3.12. This is a source package.
+
+Windows PowerShell startup correction:
+- The reported failure occurs while evaluating Join-Path in parameter defaults.
+  Distribution and Reports now default in the script body. Explicit paths are
+  normalized before elevation, and the batch build supplies absolute paths.
+- Added RESUME-PACKAGING.cmd to revalidate existing EXEs, run runtime tests and
+  create the release ZIP without recompiling or reinstalling dependencies.
+- Nine executable startup/parser regression tests passed under PowerShell
+  7.4.6 on Linux: omitted, blank, relative and absolute parameters; a source
+  folder containing spaces; a different working folder; the script-root
+  fallback; and rejection of script automatic variables in parameter defaults.
+  These tests run under Windows PowerShell when available during Windows builds.
+- Full suite, both clean and with all four supplied external tool files:
+  73 passed, 32 skipped under Linux/Python 3.12/PowerShell 7.4.6.
+- Windows PowerShell 5.1 and the packaged Windows launches have not been
+  executed in this authoring environment.
+
+Build-folder regression correction:
+- Replaced the source-tree FPT absence assertion with checks of the documented
+  download and source-control exclusions. External tools are allowed locally.
+- Release packaging test now supplies all four external tools in both the
+  source and dist folders, verifies their exclusion from the public ZIP, and
+  verifies that the local files are retained.
+- Re-ran the full suite on Linux/Python 3.12 in a checkout containing the real
+  supplied fptw64.exe, UEFIReplace.exe, pmxdll32e.DLL and idrvdll32e.DLL:
+  64 passed, 32 skipped. Optional reference ROM/native-corpus fixtures were
+  not mounted for this run. No external firmware executable was run.
+- The reported Windows dependency installation completed successfully; the
+  incorrect test assertion, before PyInstaller, caused that build to stop.
+
+Earlier source-authoring checks:
+Executed:
+- Full available pytest suite with both supplied stock XD3 ROMs mounted under
+  their expected reference names and the downloaded Windows native corpus:
+  77 passed, 19 skipped. Skips require absent optional reference ROMs or
+  additional external reference-tool conditions.
+- Runtime tests cover changed/missing DLLs, unsafe manifest paths, foreign
+  loaded modules, preload-before-import sequencing, logging an import error,
+  CLI self-test isolation, dependency order, missing exports, missing private
+  providers, conflicting DLL names, external-process directory restoration,
+  CArchive tamper detection, release-tool exclusions and stale/failed test
+  result rejection.
+- Real PE import/export checks against 45 selected Windows x64 native files
+  from official Python 3.13.14 and Qt/PySide/Shiboken 6.10.3 distributions.
+  The canonical Microsoft runtime family and actual Qt Windows platform
+  plugin are included. Both regular and delay-import tables are inspected.
+- PyInstaller 6.22.3 official x64 GUI bootloader import table inspected:
+  USER32, COMCTL32, KERNEL32, ADVAPI32 and GDI32; no VC/Qt prerequisite import.
+- Python 3.13.14 amd64 installer downloaded and SHA-256 independently checked:
+  c54d9b9bbb8a36e6489363ddd01139707fd781d72f1f9e90c7ec65d0061368e0.
+- All 18 Windows build wheels downloaded, hashes recorded, and transitive
+  requirements evaluated under Windows x64 / Python 3.13 marker conditions.
+- All project PowerShell scripts parsed successfully using PowerShell 7.4.6
+  on Linux. This is syntax validation, not execution under Windows PS 5.1.
+- Python compilation checks passed for application, hooks, scripts and tests.
+- Source GUI construction checked under Linux Qt's offscreen platform with
+  firmware-tool preflight/probe disabled. No hardware operations performed.
+- No vendor-name references reintroduced into application code/documentation.
+
+Not executed in this authoring environment:
+- Windows executable compilation.
+- Windows GUI/CLI/conflicting-DLL packaged launches.
+- Windows Sandbox launch.
+- Hardware dump/flash or a test on the Discord user's computer.
+
+The Windows build automatically performs the first two Windows steps and
+refuses to create a new release ZIP unless every packaged launch test passes
+for the exact EXE hashes. TEST-WINDOWS-SANDBOX.ps1 provides the separate
+offline clean-Windows test; results must be checked after running it.
+
+The firmware parser, Secure Boot replacement/containment implementation and
+FIT implementation remain byte-identical to v0.964. FPT and UEFIReplace
+process creation uses the new external-process DLL-directory wrapper.

@@ -1,8 +1,43 @@
-# Chinesium X99 SecureBoot Patcher v0.964
+# Chinesium X99 SecureBoot Patcher v0.966
 
 A Windows utility for updating the **factory-default Secure Boot PK, KEK and db certificates** stored in AMI Aptio-style X99 firmware images, with integrated Intel FPT BIOS dump and flash support.
 
 The Secure Boot patcher is driven by firmware structure rather than a hard-coded motherboard list. Unknown or malformed Secure Boot layouts fail closed instead of being guessed.
+
+## New in v0.966: tool checks, verified downloads and file drops
+
+The GUI checks all four required files in the `tools` folder beside the EXE
+on every launch. Each missing or incorrect file has its own **Download this
+file** button. The app downloads, verifies and installs the exact required
+file, then refreshes the status automatically. **Recheck files** also detects
+files copied there manually. Downloads run in a background thread; failed
+verification or a failed download leaves an existing file untouched.
+
+UEFIReplace comes from the official 0.28.0 release ZIP. FPT and its two DLLs
+come from a fixed revision of the public IntelCSTools mirror. Exact SHA-256
+checks cover all four installed files and the UEFIReplace ZIP. A correct
+filename or a reported version alone is not accepted. The supplied fparts.txt
+continues to be managed by the application.
+
+The GUI now starts with normal privileges so Explorer can drop files into
+it. Both the opening drop panel and the main window accept a single local
+file. BIOS compatibility checks, dumps and flashes request administrator
+permission through the companion CLI helper; ROM inspection, patching and
+tool downloads keep the GUI running normally. Keep both EXEs together.
+Start the GUI normally, rather than using **Run as administrator**.
+
+## Private GUI runtime (introduced in v0.965)
+
+The Windows build pins Python, Qt/PySide/Shiboken and PyInstaller, carries a
+compatible Microsoft C/C++ runtime inside each EXE, verifies native file
+hashes, and loads the private DLLs before Qt imports. Users do not install
+Qt or a separate VC++ redistributable for these bundled dependencies.
+Session logging now begins before the Qt import.
+
+The build must pass actual GUI/CLI EXE self-tests and a launch with conflicting
+DLLs beside the EXE and in PATH before it creates the release ZIP. See
+`RUNTIME-DEPENDENCIES.md` for the implementation and test procedure. See
+`VALIDATION-v0.966.txt` for the checks actually performed on this source.
 
 ## Secure Boot update
 
@@ -61,7 +96,7 @@ A successful flash is accepted only after FPT exits successfully, reports `FPT O
 
 This project deliberately does **not** redistribute `UEFIReplace.exe`.
 
-Download the exact Windows build from the official LongSoft/UEFITool project:
+Use **Required tools → Download this file** in the GUI, or download the exact Windows build manually from the official LongSoft/UEFITool project:
 
 - Repository: https://github.com/LongSoft/UEFITool
 - Release: https://github.com/LongSoft/UEFITool/releases/tag/0.28.0
@@ -85,9 +120,9 @@ Intel FPT is also deliberately **not redistributed** by this project.
 
 The exact verified `WIN64` directory is available here:
 
-https://github.com/CE1CECL/IntelCSTools/tree/ce1cecl/ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64
+https://github.com/CE1CECL/IntelCSTools/tree/698d2f69d952e36dbb20ac41d3fa858c2947168e/ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64
 
-Copy these three files into `tools\`:
+Use the three individual **Download this file** buttons in the GUI, or copy these three files into `tools\` manually:
 
 ```text
 tools\fptw64.exe
@@ -185,30 +220,31 @@ The existing silent rebuild safeguard remains in place: if UEFIReplace moves mic
 
 ## Building on Windows
 
-1. Put the exact `UEFIReplace.exe` in `tools\`.
-2. Put `fptw64.exe`, `pmxdll32e.DLL` and `idrvdll32e.DLL` from the verified FPT WIN64 folder in `tools\`.
-3. Run:
-
-```bat
-RUN-SETUP-AND-BUILD.cmd
-```
-
-The setup validates the pinned UEFIReplace/FPT hashes and the bundled authoritative `fparts.txt`, then builds the executables and copies the runtime documentation/data into `dist\`:
+Run `RUN-SETUP-AND-BUILD.cmd`. It creates an isolated, hash-locked build
+environment, compiles both EXEs, verifies their embedded DLLs, runs the actual
+packaged runtime tests and creates:
 
 ```text
-dist\X99-Secureboot-patcher.exe
-dist\X99-Secureboot-patcher-CLI.exe
-dist\README.txt
-dist\tools\README.txt
-dist\secureboot_donors\PkVar.ffs
-dist\secureboot_donors\KekVar.ffs
-dist\secureboot_donors\dbVar.ffs
-dist\fpt_support\fparts.txt
+Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip
+Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip.sha256
 ```
 
-`dist\README.txt` is the main end-user guide. `dist\tools\README.txt` gives the exact download locations, required hashes, filenames, and placement instructions for the external UEFIReplace and Intel FPT files.
+External UEFIReplace/FPT binaries are not needed to compile or test GUI
+startup. If you supply them in `tools`, the build copies them into the local
+`dist/tools` for your own use. The public ZIP automatically excludes those
+four external binaries and retains `tools/README.txt` with download and
+placement instructions. The authoritative `fpt_support/fparts.txt` and all
+three donor files are included. The compiled EXEs carry their private runtime
+DLLs internally; runtime manifests and license notices are also included.
 
-The GUI executable requests Administrator privileges because direct FPT dump/flash operations require elevated hardware access.
+The setup log is `setup-build-X99-Secureboot-patcher.log`. Detailed packaged
+test results are in `build/windows-runtime-test.log` and
+`build/windows-runtime-tests.json`. The GUI and its packaged test runner
+request Administrator privileges as required by the existing GUI manifest.
+
+For clean-machine offline validation after building, run
+`TEST-WINDOWS-SANDBOX.ps1` on a machine where Windows Sandbox is enabled.
+This additional Sandbox test is not performed automatically by the build.
 
 ## After flashing a Secure Boot-patched ROM
 
@@ -218,4 +254,11 @@ After flashing, use the motherboard's Secure Boot / Key Management menu to clear
 
 ## Version
 
-Public release version: **v0.964**.
+Public release version: **v0.966**.
+
+## Automated Windows releases
+
+The Windows release workflow builds with the same pinned setup and requires
+the source suite, finished-EXE audit and packaged launch/drop tests to pass
+before publishing a new application version. Build logs, native manifests,
+source-test results and runtime reports are retained with the workflow run.

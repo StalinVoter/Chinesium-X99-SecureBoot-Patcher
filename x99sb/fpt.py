@@ -15,14 +15,10 @@ import tempfile
 
 from .tools import app_directory, sha256_file
 from .sessionlog import log, log_block, log_json
+from .constants import FPT_VERSION, FPT_SHA256, FPT_FILE_SHA256, FPT_SOURCE_FOLDER_URL
+from .fpt_elevation import needs_elevation, run_elevated
 
-FPT_VERSION = '9.1.10.1000'
-FPT_SHA256 = 'b7e942e903f5f6bba84c3e9294edc8cc097c1173ca249a41a4cca1ab9e15a697'
 FPARTS_SHA256 = '9f815e22fdc5562f0af6ac552c27e0adccf9f3654c3d76dbc4f9cc9278bc2313'
-FPT_SOURCE_FOLDER_URL = (
-    'https://github.com/CE1CECL/IntelCSTools/tree/ce1cecl/'
-    'ME%20System%20Tools%20v9.1%20r7/Flash%20Programming%20Tool/WIN64'
-)
 FPT_REQUIRED_FILES = ('fptw64.exe', 'pmxdll32e.DLL', 'idrvdll32e.DLL')
 
 EventCallback = Callable[[dict[str, Any]], None]
@@ -140,6 +136,15 @@ def validate_fpt_installation() -> dict[str, Any]:
         }
         _log_validation_result(result)
         return result
+    for name in ('pmxdll32e.DLL', 'idrvdll32e.DLL'):
+        digest = sha256_file(folder / name)
+        if digest != FPT_FILE_SHA256[name]:
+            result = {
+                'ready': False, 'reason': 'wrong-fpt-dependency', 'missing': [],
+                'message': f'{name} is not the required companion file for Intel FPT {FPT_VERSION}. Download/repair it in Required tools.',
+            }
+            _log_validation_result(result)
+            return result
     source = authoritative_fparts()
     log('FPT PREFLIGHT', f'Authoritative fparts source: {source}')
     if not source.is_file():
@@ -199,7 +204,8 @@ def memory_integrity_running() -> bool | None:
     shown = subprocess.list2cmdline(cmd)
     log('MEMORY INTEGRITY', f'Command: {shown}')
     try:
-        cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=12, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        from .nativeprocess import run
+        cp = run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=12, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         raw = cp.stdout.decode(locale.getpreferredencoding(False) or 'utf-8', errors='replace')
         log('MEMORY INTEGRITY', f'Exit code: {cp.returncode}')
         log_block('MEMORY INTEGRITY', 'PowerShell stdout/stderr', raw.rstrip())
@@ -317,7 +323,8 @@ def _run_fpt(args: list[str], group: str, callback: EventCallback | None = None,
     _emit(callback, type='transcript', group=group, text='> ' + shown)
     transcript = ['> ' + shown]
     si, creationflags = _startupinfo()
-    proc = subprocess.Popen(
+    from .nativeprocess import popen
+    proc = popen(
         command,
         cwd=str(fpt.parent),
         stdout=subprocess.PIPE,
@@ -387,11 +394,19 @@ def _log_probe_summary(result: dict[str, Any]) -> None:
 def probe_fpt(callback: EventCallback | None = None) -> dict[str, Any]:
     log('FPT PREFLIGHT', 'Starting launch-time FPT compatibility probe')
     status = validate_fpt_installation()
-    hvci = memory_integrity_running()
     if not status['ready']:
-        result = {'ready': False, 'hvci': hvci, 'probe': None, 'reason': status['reason'], 'message': status['message']}
+        result = {'ready': False, 'hvci': None, 'probe': None, 'reason': status['reason'], 'message': status['message']}
         _log_probe_summary(result)
         return result
+    if needs_elevation():
+        try:
+            result = run_elevated('probe', callback=callback)
+        except Exception as exc:
+            result = {'ready': False, 'hvci': None, 'probe': None,
+                      'reason': 'administrator-permission', 'message': str(exc)}
+        _log_probe_summary(result)
+        return result
+    hvci = memory_integrity_running()
     try:
         # The installation was validated immediately above. Reusing that result
         # prevents the same tool/hash inventory being written twice to the session
@@ -509,6 +524,10 @@ def dump_bios(output: Path, callback: EventCallback | None = None) -> DumpResult
     output = output.resolve()
     log('DUMP', f'Manual BIOS dump requested: {output}')
     try:
+        if needs_elevation():
+            result = DumpResult(**run_elevated('dump', output, callback))
+            _log_dump_summary(result)
+            return result
         _emit(callback, type='status', text='Dumping the installed BIOS…')
         run = _dump_once(output, 'Dump BIOS', callback)
         if not run.success:
@@ -615,6 +634,16 @@ def _flash_result(*, success: bool, target: Path, backup: BackupResult | None, f
 
 def flash_bios_with_recovery(target: Path, callback: EventCallback | None = None) -> FlashResult:
     target = target.resolve()
+    if needs_elevation():
+        try:
+            return FlashResult(**run_elevated('flash', target, callback))
+        except Exception as exc:
+            result = _flash_result(success=False, target=target, backup=None,
+                                   flash_run=None, recovery_attempted=False,
+                                   recovery_success=None, recovery_run=None,
+                                   error=f'{type(exc).__name__}: {exc}')
+            _write_flash_report(result)
+            return result
     log('FLASH', f'Flash workflow requested for target: {target}')
     if target.is_file():
         log('FLASH', f'Target size={target.stat().st_size} SHA-256={sha256_file(target)}')

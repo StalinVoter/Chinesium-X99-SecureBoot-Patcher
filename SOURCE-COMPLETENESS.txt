@@ -1,24 +1,85 @@
-Chinesium X99 SecureBoot Patcher v0.964 source completeness
-==========================================================
+Chinesium X99 SecureBoot Patcher v0.966 source package
 
-Included:
-- complete Python GUI/CLI source;
-- Secure Boot parser/patch engine;
-- selective rebuild-metadata safeguard;
-- Intel FPT dump/flash/recovery integration source;
-- authoritative fpt_support\fparts.txt;
-- validated PK/KEK/db update payloads;
-- Windows setup/build scripts;
-- application-wide de-duplicated session logging and centralized build-report routing;
-- Secure Boot build progress tracker and GUI progress-bar integration;
-- stateful FPT read/erase/program/verify progress sequencing;
-- regression tests;
-- public README/release/validation documentation.
+Complete source, exact-tool inventory/downloader, normal-privilege GUI with
+file-drop handling, elevated BIOS-access CLI helper, isolated Windows build,
+private native-runtime verification, mandatory packaged runtime/drop tests,
+release ZIP packager, tests, donor files, fparts.txt and third-party notices.
 
-Deliberately NOT redistributed:
-- UEFIReplace.exe 0.28.0;
-- fptw64.exe 9.1.10.1000;
-- pmxdll32e.DLL;
-- idrvdll32e.DLL.
+External firmware tool binaries are not redistributed. The GUI downloads
+and verifies the four required files on demand into tools beside the EXE.
+This is source, not precompiled Windows executables.
 
-README.md and tools\README.txt identify the exact public sources and required hashes.
+Build: RUN-SETUP-AND-BUILD.cmd. Upgrading from v0.965 requires a new build.
+Validation and Windows integration limits: VALIDATION-v0.966.txt.
+
+Files (SHA256SUMS.txt covers every listed file except itself):
+.gitattributes
+.github/workflows/windows-release.yml
+.gitignore
+GITHUB-RELEASE-v0.964.md
+GITHUB-RELEASE-v0.965.md
+GITHUB-RELEASE-v0.966.md
+INSTALL-BUILD-PREREQUISITES.ps1
+README.md
+README.txt
+RELEASE-NOTES-v0.964.txt
+RELEASE-NOTES-v0.965.txt
+RELEASE-NOTES-v0.966.txt
+RUN-SETUP-AND-BUILD.cmd
+RUNTIME-DEPENDENCIES.md
+SHA256SUMS.txt
+SOURCE-COMPLETENESS.txt
+TEST-PACKAGED-RUNTIME.ps1
+TEST-WINDOWS-SANDBOX.ps1
+VALIDATION-v0.964.txt
+VALIDATION-v0.965.txt
+VALIDATION-v0.966.txt
+VALIDATION.txt
+X99SecurebootPatcher-CLI.py
+X99SecurebootPatcher-GUI.py
+build_exe.bat
+fpt_support/fparts.txt
+hooks/runtime_first.py
+licenses/GPL-2.0-only.txt
+licenses/GPL-3.0-only.txt
+licenses/LGPL-3.0-only.txt
+licenses/THIRD-PARTY-NOTICES.txt
+patcher.spec
+requirements-build.lock
+requirements.txt
+scripts/build_support.py
+scripts/copy_licenses.py
+scripts/package_release.py
+scripts/verify_exe.py
+secureboot_donors/KekVar.ffs
+secureboot_donors/PkVar.ffs
+secureboot_donors/dbVar.ffs
+tests/test_buildprogress.py
+tests/test_drag_drop.py
+tests/test_fpt.py
+tests/test_fpt_elevation.py
+tests/test_gui_tool_downloads.py
+tests/test_powershell_startup.py
+tests/test_release_package.py
+tests/test_runtime.py
+tests/test_secureboot.py
+tests/test_session_logging.py
+tests/test_tool_inventory.py
+tools/README.txt
+x99sb/__init__.py
+x99sb/buildprogress.py
+x99sb/cli.py
+x99sb/constants.py
+x99sb/firmware.py
+x99sb/fit.py
+x99sb/fpt.py
+x99sb/fpt_elevation.py
+x99sb/gui.py
+x99sb/nativeprocess.py
+x99sb/pipeline.py
+x99sb/replacer.py
+x99sb/runtime_bootstrap.py
+x99sb/secureboot.py
+x99sb/sessionlog.py
+x99sb/tool_inventory.py
+x99sb/tools.py
