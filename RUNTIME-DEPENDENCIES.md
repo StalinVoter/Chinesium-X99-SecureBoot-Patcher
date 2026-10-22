@@ -105,3 +105,7 @@ The generated public file is
 `Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip`, with a companion
 SHA-256 file. The ZIP includes both EXEs, root and tools READMEs, donor files,
 the authoritative fparts.txt, runtime manifests and third-party notices.
+
+On supported Windows 10+ systems, ucrtbase.dll, msvcp_win.dll and Windows
+API-set contracts are supplied by Windows and excluded from the private DLL
+inventory. The pinned MSVC v14 runtime DLLs remain bundled and checked.

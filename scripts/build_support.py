@@ -114,11 +114,18 @@ def seal_collection(binaries: list, runtime_source: Path, kind: str, versions: d
             raise RuntimeError(f'Pinned runtime wheel is missing {name}')
     accepted = []
     for destination, source, typ in binaries:
-        if MSVC.fullmatch(Path(destination).name):
-            if Path(destination).name.casefold() not in canonical:
+        destination = destination.replace('\\', '/')
+        name = PurePosixPath(destination).name.casefold()
+        # On supported Windows 10+ systems the UCRT and API-set contracts are
+        # OS components. Windows can load them before Python's startup hook;
+        # they must not be inventoried as private app-local runtime copies.
+        if name in ('ucrtbase.dll', 'msvcp_win.dll') or name.startswith(('api-ms-win-', 'ext-ms-win-')):
+            continue
+        if MSVC.fullmatch(name):
+            if name not in canonical:
                 raise RuntimeError(f'No pinned source for runtime DLL: {destination}')
             continue
-        accepted.append((destination.replace('\\', '/'), source, typ))
+        accepted.append((destination, source, typ))
     accepted.extend((name, str(path), 'BINARY') for name, path in sorted(canonical.items()))
     files = {dest: Path(src) for dest, src, _ in accepted if dest.lower().endswith(('.dll', '.pyd'))}
     by_name = validate_imports(files)

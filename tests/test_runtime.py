@@ -155,6 +155,23 @@ def test_different_private_copies_of_same_dll_are_build_error(tmp_path):
         bs.validate_imports({'x/Qt6Core.dll': a, 'y/Qt6Core.dll': b})
 
 
+def test_os_ucrt_is_not_mistaken_for_private_runtime(monkeypatch, tmp_path):
+    runtime = tmp_path / 'runtime'; runtime.mkdir()
+    for name in ('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'msvcp140_1.dll', 'msvcp140_2.dll'):
+        (runtime / name).write_bytes(b'pinned runtime fixture')
+    os_names = ('ucrtbase.dll', 'msvcp_win.dll', 'api-ms-win-crt-runtime-l1-1-0.dll', 'ext-ms-win-ntuser-window-l1-1-0.dll')
+    entries = [('PySide6\\' + name, str(tmp_path / name), 'BINARY') for name in os_names]
+    monkeypatch.setattr(bs, 'native_info', lambda path: {'imports': {'ucrtbase.dll': []}, 'exports': set()})
+    sealed, info = bs.seal_collection(entries, runtime, 'cli', {})
+    assert all(name not in relative for relative in info['files'] for name in os_names)
+    assert set(info['files']) == {p.name for p in runtime.iterdir()}
+    root = tmp_path / 'private'
+    root.mkdir()
+    for relative in info['files']:
+        (root / relative).write_bytes(b'pinned runtime fixture')
+    rt.verify_loaded(root, info, [root / relative for relative in info['files']] + [tmp_path / 'Windows' / 'System32' / 'ucrtbase.dll'])
+
+
 def test_external_tool_search_directory_is_restored_on_spawn_failure(monkeypatch):
     from x99sb import nativeprocess
     events = []

@@ -8,7 +8,8 @@
   Every normal packaged launch checks native-file hashes and loaded paths;
   GUI startup also checks Qt binding/runtime versions and plugin locations.
   This addresses the reported QtCore DLL startup failure without relying on
-  whichever Qt or Visual C++ DLLs happen to be installed elsewhere.
+  whichever Qt or Visual C++ DLLs happen to be installed elsewhere. Windows
+  continues to supply its own Universal CRT and API-set system components.
 - **Earlier diagnostics:** session logging begins before Qt imports. Native
   startup errors identify the failed dependency and diagnostic log, including
   when the GUI cannot initialize. Logs also have a writable-folder fallback.
