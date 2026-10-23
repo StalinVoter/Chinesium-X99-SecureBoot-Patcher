@@ -192,7 +192,7 @@ def fail_startup(exc: BaseException) -> int:
     if sys.stderr is not None:
         print(message, file=sys.stderr)
     # Automated self-tests must never block on a modal error dialog.
-    if sys.platform == 'win32' and '--runtime-self-test' not in sys.argv:
+    if sys.platform == 'win32' and not any(flag in sys.argv for flag in ('--runtime-self-test', '--bios-helper-self-test', '--fpt-helper')):
         try:
             import ctypes
             ctypes.windll.user32.MessageBoxW(None, message, 'X99 SecureBoot Patcher startup problem', 0x10)
@@ -265,6 +265,10 @@ def run(kind: str) -> int:
         prepare_runtime()
         if '--runtime-self-test' in sys.argv:
             return runtime_self_test(kind)
+        if '--bios-helper-self-test' in sys.argv:
+            from .fpt_elevation import transport_self_test
+            report = Path(sys.argv[sys.argv.index('--runtime-report') + 1])
+            return transport_self_test(report)
         if '--fpt-helper' in sys.argv:
             if kind != 'cli':
                 raise RuntimeError('BIOS access helper must use the CLI executable.')

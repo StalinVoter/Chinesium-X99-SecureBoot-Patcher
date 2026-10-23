@@ -1,0 +1,28 @@
+Chinesium X99 SecureBoot Patcher v0.967 — validation scope
+
+Regression coverage added for caller-created reply files, preserving file
+identity during elevated helper writes, successful result handling despite
+cleanup denial, preserving an original error despite cleanup denial,
+inaccessible/empty/missing/malformed helper replies, failed helper exit codes,
+cancelled elevation and FPT revoked-driver certificate errors.
+
+Windows-only integration runs when the test runner is elevated: a real medium
+integrity impersonation token creates the exchange files; a separate elevated
+CLI process executes the production check-transport handler; the medium token
+reads and deletes the reply and confirms the file identity is unchanged.
+This test never loads FPT or accesses firmware hardware.
+
+The Windows build requires GUI, CLI, conflicting-DLL and helper-transport
+packaged tests. The last uses the production GUI entry point and companion
+CLI through ShellExecuteExW/runas with diagnostic messages only. Actual EXE
+hashes bind the reports to the distributed executables.
+
+An elevated CI runner does not exercise an interactive UAC consent prompt.
+Run TEST-ELEVATED-HELPER.cmd normally on a Windows user's PC to test that
+prompt and normal-user-to-administrator packaged handoff. Its report records
+caller_elevated, helper_elevated and whether transport verification succeeded.
+
+No physical BIOS probe, dump, flash or automatic recovery operation is
+performed in these tests. The firmware patching modules and flash/recovery
+implementation are unchanged. Final CI counts and build evidence are appended
+to the published GitHub release notes by the successful Windows workflow.

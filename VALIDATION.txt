@@ -1,61 +1,28 @@
-Chinesium X99 SecureBoot Patcher v0.966 — validation
+Chinesium X99 SecureBoot Patcher v0.967 — validation scope
 
-Based on the corrected v0.965 source. Authoring environment: Linux/Python 3.12,
-PySide6 Essentials/Shiboken 6.10.3, PowerShell 7.4.6.
+Regression coverage added for caller-created reply files, preserving file
+identity during elevated helper writes, successful result handling despite
+cleanup denial, preserving an original error despite cleanup denial,
+inaccessible/empty/missing/malformed helper replies, failed helper exit codes,
+cancelled elevation and FPT revoked-driver certificate errors.
 
-Executed:
-- Full suite with both supplied XD3 stock ROM reference fixtures:
-  117 passed, 20 skipped. Optional absent board/reference-tool/native-corpus
-  fixtures account for the remaining skips.
-- Live HTTPS downloads through the production installer of all four files:
-  UEFIReplace.exe, fptw64.exe, pmxdll32e.DLL and idrvdll32e.DLL. All four
-  installed and passed exact size/SHA-256 inventory checks. The UEFIReplace
-  release ZIP hash and executable hash were checked independently.
-- GUI button tests run the real Qt worker/thread path, verify installation,
-  refreshed status and a follow-up FPT check; failed verification preserves
-  the previous file and permits retry. The FPT check itself is mocked in
-  GUI tests so no hardware operation is attempted.
-- Inventory/download cases cover missing/wrong files, same-size wrong bytes,
-  directory collisions, HTML/empty/oversized downloads, network failures,
-  locked destinations, temporary-file cleanup and archive path rejection.
-- FPT rejects incorrect companion DLLs before hardware access.
-- Actual Qt file-drop events on both the production opening panel and main
-  window reach ROM loading, including filenames with spaces and non-ASCII
-  characters. Invalid URL/directory/multiple-file drops are rejected.
-- The production runtime self-test constructs the full GUI in diagnostic
-  mode and completes its file-drop checks on Linux's offscreen platform.
-  It correctly refuses to report overall Windows-platform success there.
-- Helper command/transport tests cover the companion CLI location, streamed
-  partial JSON events, original user backup location, cancelled elevation,
-  and dispatch of a complete mocked flash/backup/recovery workflow.
-- PyInstaller's pinned manifest generator produces asInvoker for this spec.
-  Finished Windows EXE resource manifests and packaged GUI drop routing are
-  mandatory validation gates in the Windows build/release packager.
-- PowerShell syntax/startup regression checks and Python compilation passed.
-- Firmware parser, replacement containment, Secure Boot payload processing,
-  pipeline and FIT modules remain byte-identical to v0.965.
+Windows-only integration runs when the test runner is elevated: a real medium
+integrity impersonation token creates the exchange files; a separate elevated
+CLI process executes the production check-transport handler; the medium token
+reads and deletes the reply and confirms the file identity is unchanged.
+This test never loads FPT or accesses firmware hardware.
 
-Not executed here:
-- Windows EXE compilation, Windows Explorer OLE drag-and-drop, Windows UAC
-  helper launch, or the actual packaged GUI/CLI/conflicting-DLL launches.
-- A hardware BIOS probe, dump or flash, or Windows Sandbox launch.
+The Windows build requires GUI, CLI, conflicting-DLL and helper-transport
+packaged tests. The last uses the production GUI entry point and companion
+CLI through ShellExecuteExW/runas with diagnostic messages only. Actual EXE
+hashes bind the reports to the distributed executables.
 
-The Windows builder runs the source suite, validates actual EXE native bytes
-and asInvoker manifests, then requires GUI/CLI/conflicting-DLL tests including
-real packaged GUI file-drop routing before creating the Windows release ZIP.
-Explorer/UAC integration still needs verification on Windows. Source Qt event
-checks and mocked helper tests are not a claim of Windows integration testing.
+An elevated CI runner does not exercise an interactive UAC consent prompt.
+Run TEST-ELEVATED-HELPER.cmd normally on a Windows user's PC to test that
+prompt and normal-user-to-administrator packaged handoff. Its report records
+caller_elevated, helper_elevated and whether transport verification succeeded.
 
-Live download sources checked on 2026-10-22:
-UEFIReplace: official LongSoft/UEFITool 0.28.0 Windows release archive.
-FPT: CE1CECL/IntelCSTools mirror, fixed commit
-698d2f69d952e36dbb20ac41d3fa858c2947168e.
-Exact installed hashes are pinned in x99sb/constants.py; archive size/hash
-and per-file byte sizes are pinned in x99sb/tool_inventory.py.
-
-Generated-ROM confirmation follow-up:
-Verified exact original first-dialog text and exact user-supplied second-dialog
-text through the real MainWindow completion method. Four mocked consent and
-readiness paths confirm no flash dispatch after either No choice or failed
-readiness. Rendered the second dialog in offscreen Qt; Python compilation and
-the 10 existing GUI-download/drag-drop tests passed. No BIOS access performed.
+No physical BIOS probe, dump, flash or automatic recovery operation is
+performed in these tests. The firmware patching modules and flash/recovery
+implementation are unchanged. Final CI counts and build evidence are appended
+to the published GitHub release notes by the successful Windows workflow.

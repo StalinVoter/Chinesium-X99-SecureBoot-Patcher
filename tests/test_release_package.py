@@ -11,6 +11,7 @@ def fixture_release(root: Path):
     dist = root / 'dist'; dist.mkdir()
     (root / 'tools').mkdir()
     (root / 'tools' / 'README.txt').write_text('tool instructions')
+    (root / 'TEST-ELEVATED-HELPER.cmd').write_text('diagnostic fixture')
     (dist / 'README.txt').write_text('runtime guide')
     for folder in ('secureboot_donors', 'fpt_support', 'licenses', 'tools'):
         (dist / folder).mkdir()
@@ -22,10 +23,15 @@ def fixture_release(root: Path):
     for kind in ('gui', 'cli', 'conflicting-dlls'):
         name = 'X99-Secureboot-patcher' + ('-CLI' if kind == 'cli' else '') + '.exe'
         (dist / name).write_bytes(name.encode())
-        report = {'success': True, 'version': '0.966', 'platform': 'windows', 'drag_drop_verified': True,
+        report = {'success': True, 'version': '0.967', 'platform': 'windows', 'drag_drop_verified': True,
                   'exe_sha256': sha256((dist / name).read_bytes()).hexdigest()}
         (root / 'build' / f'smoke-{kind}.json').write_text(json.dumps(report))
         cases.append({'case': kind, 'success': True})
+    cases.append({'case': 'helper-transport', 'success': True})
+    (root / 'build' / 'smoke-helper-transport.json').write_text(json.dumps({
+        'success': True, 'hardware_access': False, 'result': {'transport_verified': True,
+            'helper_exe_sha256': sha256((dist / 'X99-Secureboot-patcher-CLI.exe').read_bytes()).hexdigest()},
+        'exe_sha256': sha256((dist / 'X99-Secureboot-patcher.exe').read_bytes()).hexdigest()}))
     # PowerShell 5.1 reports have a UTF-8 BOM.
     (root / 'build' / 'windows-runtime-tests.json').write_text(json.dumps({'success': True, 'cases': cases}), encoding='utf-8-sig')
     for kind in ('gui', 'cli'):
@@ -74,4 +80,15 @@ def test_public_zip_is_blocked_without_packaged_drop_test(monkeypatch, tmp_path)
     report.pop('drag_drop_verified')
     path.write_text(json.dumps(report))
     with pytest.raises(RuntimeError, match='file-drop test'):
+        package_release.package(tmp_path)
+
+
+def test_public_zip_requires_helper_test_for_the_exact_cli(monkeypatch, tmp_path):
+    fixture_release(tmp_path)
+    monkeypatch.setattr(verify_exe, 'verify', lambda p: {})
+    path = tmp_path / 'build' / 'smoke-helper-transport.json'
+    report = json.loads(path.read_text())
+    report['result']['helper_exe_sha256'] = 'different executable'
+    path.write_text(json.dumps(report))
+    with pytest.raises(RuntimeError, match='helper exchange'):
         package_release.package(tmp_path)

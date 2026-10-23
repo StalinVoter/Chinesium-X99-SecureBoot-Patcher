@@ -6,7 +6,7 @@ if not exist "%BUILD_PY%" (
   echo Run RUN-SETUP-AND-BUILD.cmd to create the pinned build environment.
   exit /b 1
 )
-for %%F in (Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip.sha256) do if exist "%%F" del /q "%%F"
+for %%F in (Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip.sha256) do if exist "%%F" del /q "%%F"
 for %%F in (X99-Secureboot-patcher.exe X99-Secureboot-patcher-CLI.exe) do if exist "dist\%%F" del /q "dist\%%F"
 if exist "build" rmdir /s /q "build"
 mkdir "build"
@@ -41,5 +41,5 @@ powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0TEST-PACKA
 if errorlevel 1 exit /b 1
 "%BUILD_PY%" scripts\package_release.py
 if errorlevel 1 exit /b 1
-echo Ready: Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip
+echo Ready: Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip
 exit /b 0

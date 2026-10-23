@@ -81,13 +81,16 @@ jobs:
             $Failures += [int]$Suite.failures + [int]$Suite.errors
           }
           if ($Failures -ne 0) { throw 'Source tests have failures.' }
+          $BoundaryTest = @($Suites.testcase | Where-Object { $_.name -eq 'test_real_elevated_helper_preserves_medium_caller_reply_access' })
+          if ($BoundaryTest.Count -ne 1 -or $BoundaryTest[0].SelectNodes('skipped|failure|error').Count -ne 0) { throw 'Windows medium/elevated file exchange was not verified.' }
           $Passed = $Total - $Skipped
           $Hash = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
           $Body = Get-Content -LiteralPath $Guide -Raw
           $Body += "`n`n## Publication validation`n`n"
           $Body += "Windows Server 2022, Python 3.13.14: **$Passed passed, $Skipped skipped**. "
           $Body += "Both finished EXEs passed native-byte and asInvoker-manifest validation. "
-          $Body += "GUI, CLI and conflicting-DLL packaged launches passed, including GUI file-drop routing. "
+          $Body += "GUI, CLI, conflicting-DLL and production runas helper-transport packaged launches passed, including GUI file-drop routing. "
+          $Body += "A Windows token/ACL integration test verified reply creation, reading and cleanup under a medium-integrity caller token after a separate elevated helper wrote the file in place. "
           $Body += "No physical BIOS probe, dump or flash was performed. Windows Explorer/UAC interaction was not manually exercised.`n`n"
           $Body += "Build evidence: https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID`n`n"
           $Body += "Asset: $Archive`n`nSHA-256: $Hash`n"

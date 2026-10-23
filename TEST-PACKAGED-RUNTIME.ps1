@@ -29,7 +29,7 @@ $Success = $false
 $Scratch = Join-Path $env:TEMP ('X99-Runtime-Test-' + [Guid]::NewGuid().ToString('N'))
 try {
     New-Item -ItemType Directory -Path $Scratch | Out-Null
-    foreach ($CaseName in @('gui','cli','conflicting-dlls')) {
+    foreach ($CaseName in @('gui','cli','conflicting-dlls','helper-transport')) {
         $CaseDir = Join-Path $Scratch $CaseName
         New-Item -ItemType Directory -Path $CaseDir | Out-Null
         $Name = 'X99-Secureboot-patcher.exe'
@@ -37,11 +37,17 @@ try {
         $SourceExe = Join-Path $Distribution $Name
         $TargetExe = Join-Path $CaseDir $Name
         Copy-Item -LiteralPath $SourceExe -Destination $TargetExe
+        if ($CaseName -eq 'helper-transport') {
+            Copy-Item -LiteralPath (Join-Path $Distribution 'X99-Secureboot-patcher-CLI.exe') -Destination $CaseDir
+        }
         $Output = Join-Path $Reports ('smoke-' + $CaseName + '.json')
         Remove-Item -LiteralPath $Output -Force -ErrorAction SilentlyContinue
         $StartInfo = New-Object Diagnostics.ProcessStartInfo
         $StartInfo.FileName = $TargetExe
         $StartInfo.Arguments = '--runtime-self-test --runtime-report "{0}"' -f $Output
+        if ($CaseName -eq 'helper-transport') {
+            $StartInfo.Arguments = '--bios-helper-self-test --runtime-report "{0}"' -f $Output
+        }
         $StartInfo.UseShellExecute = $false
         $StartInfo.WorkingDirectory = $CaseDir
         $StartInfo.EnvironmentVariables['X99_SECUREBOOT_PATCHER_HOME'] = $CaseDir
@@ -65,10 +71,11 @@ try {
         if ($Process.ExitCode -ne 0) { throw "$CaseName packaged self-test failed with exit code $($Process.ExitCode). Logs: $CaseDir" }
         if (-not (Test-Path -LiteralPath $Output)) { throw "$CaseName produced no JSON result." }
         $Result = Get-Content -LiteralPath $Output -Raw | ConvertFrom-Json
-        if ($Result.success -ne $true -or $Result.version -ne '0.966') { throw "$CaseName reported failure." }
+        if ($Result.success -ne $true -or $Result.version -ne '0.967') { throw "$CaseName reported failure." }
         if ($Result.exe_sha256 -ne (Get-FileHash -LiteralPath $SourceExe -Algorithm SHA256).Hash.ToLowerInvariant()) { throw 'Self-test EXE hash mismatch.' }
-        if ($CaseName -ne 'cli' -and $Result.platform -ne 'windows') { throw 'The actual Windows Qt platform was not tested.' }
-        if ($CaseName -ne 'cli' -and $Result.drag_drop_verified -ne $true) { throw 'The packaged GUI file-drop test did not pass.' }
+        if ($CaseName -in @('gui','conflicting-dlls') -and $Result.platform -ne 'windows') { throw 'The actual Windows Qt platform was not tested.' }
+        if ($CaseName -in @('gui','conflicting-dlls') -and $Result.drag_drop_verified -ne $true) { throw 'The packaged GUI file-drop test did not pass.' }
+        if ($CaseName -eq 'helper-transport' -and ($Result.result.transport_verified -ne $true -or $Result.hardware_access -ne $false)) { throw 'The packaged helper exchange did not pass.' }
         $Results.Add([pscustomobject]@{case=$CaseName; success=$true; exe_sha256=$Result.exe_sha256})
         $Logs = Join-Path $CaseDir 'LOGS'
         if (Test-Path -LiteralPath $Logs) {

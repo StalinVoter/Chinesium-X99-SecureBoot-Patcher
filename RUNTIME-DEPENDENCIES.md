@@ -1,4 +1,4 @@
-# Native runtime deployment in v0.966
+# Native runtime deployment in v0.967
 
 The release targets Windows 11 x64. Its Qt and Microsoft C/C++ runtime files
 are carried inside the GUI EXE. The CLI has its own smaller native manifest.
@@ -74,6 +74,10 @@ Every Windows build runs `TEST-PACKAGED-RUNTIME.ps1` before packaging:
    EXE, in the current directory and in PATH; foreign Qt environment settings
    are also supplied. This case must still use the private runtime and the
    Windows platform plugin.
+4. GUI entry point: launch the actual companion CLI with ShellExecuteExW/runas,
+   stream a diagnostic event and read its result after exit. This check uses
+   check-transport only and never accesses BIOS hardware. Both EXE hashes are
+   recorded and checked before packaging.
 
 The GUI self-tests construct the production window in runtime-check mode,
 with tool/payload preflight and the BIOS probe suppressed. File-drop events
@@ -82,9 +86,10 @@ ROM loader. No network download, BIOS probe, dump, patch or flash occurs. Each s
 identifies the exact EXE SHA-256. ZIP packaging rejects missing results,
 failed cases, results for different executables and altered CArchive files.
 Both EXEs use asInvoker manifests, verified from the actual finished PE
-resources. The test runner does not request elevation. Only the BIOS access
-helper requests administrator permission for a compatibility probe, dump or
-complete flash/backup/recovery operation. GUI file-drop routing must pass
+resources. The fourth test requests helper elevation; on an already elevated
+CI runner this does not exercise an interactive UAC prompt. The BIOS access
+helper also requests administrator permission for a compatibility probe, dump
+or complete flash/backup/recovery operation. GUI file-drop routing must pass
 inside both packaged GUI launch cases before ZIP packaging can proceed.
 
 Run `TEST-WINDOWS-SANDBOX.ps1` after building for the same tests in a fresh,
@@ -94,6 +99,13 @@ maps source and binaries read-only and writes results under
 current-machine build tests and is not falsely recorded as having run when
 it has not.
 
+The normal GUI creates result.json and events.jsonl before helper elevation.
+The helper opens these existing files in place and never renames an elevated
+replacement reply over the caller's file. The GUI waits for helper exit before
+reading the reply. Cleanup exceptions are logged separately and never replace
+an operation result. TEST-ELEVATED-HELPER.cmd exercises this exchange with a
+diagnostic message on a user's PC; start it normally to test interactive UAC.
+
 ## Output
 
 The local `dist` may contain the user's firmware tools if they were supplied
@@ -102,9 +114,10 @@ directory and excludes those four binaries automatically. Their originals
 remain untouched. Runtime DLLs remain inside the application EXEs.
 
 The generated public file is
-`Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip`, with a companion
+`Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip`, with a companion
 SHA-256 file. The ZIP includes both EXEs, root and tools READMEs, donor files,
-the authoritative fparts.txt, runtime manifests and third-party notices.
+the authoritative fparts.txt, runtime manifests, helper-test script and
+third-party notices.
 
 On supported Windows 10+ systems, ucrtbase.dll, msvcp_win.dll and Windows
 API-set contracts are supplied by Windows and excluded from the private DLL

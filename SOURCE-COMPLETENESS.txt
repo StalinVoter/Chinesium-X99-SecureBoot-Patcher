@@ -1,16 +1,16 @@
-Chinesium X99 SecureBoot Patcher v0.966 source package
+Chinesium X99 SecureBoot Patcher v0.967 source package
 
-Complete source, exact-tool inventory/downloader, normal-privilege GUI with
-file-drop handling, elevated BIOS-access CLI helper, isolated Windows build,
-private native-runtime verification, mandatory packaged runtime/drop tests,
-release ZIP packager, tests, donor files, fparts.txt and third-party notices.
+Complete source, caller-owned BIOS helper reply files, separate cleanup and
+helper failure diagnostics, hardware-free packaged helper exchange test,
+Windows medium/elevated token regression, exact-tool inventory/downloader,
+normal-privilege GUI with file drops, isolated Windows build and runtime checks.
 
 External firmware tool binaries are not redistributed. The GUI downloads
 and verifies the four required files on demand into tools beside the EXE.
 This is source, not precompiled Windows executables.
 
-Build: RUN-SETUP-AND-BUILD.cmd. Upgrading from v0.965 requires a new build.
-Validation and Windows integration limits: VALIDATION-v0.966.txt.
+Build: RUN-SETUP-AND-BUILD.cmd. Rebuild both EXEs when upgrading.
+Validation and Windows integration limits: VALIDATION-v0.967.txt.
 
 Files (SHA256SUMS.txt covers every listed file except itself):
 .gitattributes
@@ -19,21 +19,25 @@ Files (SHA256SUMS.txt covers every listed file except itself):
 GITHUB-RELEASE-v0.964.md
 GITHUB-RELEASE-v0.965.md
 GITHUB-RELEASE-v0.966.md
+GITHUB-RELEASE-v0.967.md
 INSTALL-BUILD-PREREQUISITES.ps1
 README.md
 README.txt
 RELEASE-NOTES-v0.964.txt
 RELEASE-NOTES-v0.965.txt
 RELEASE-NOTES-v0.966.txt
+RELEASE-NOTES-v0.967.txt
 RUN-SETUP-AND-BUILD.cmd
 RUNTIME-DEPENDENCIES.md
 SHA256SUMS.txt
 SOURCE-COMPLETENESS.txt
+TEST-ELEVATED-HELPER.cmd
 TEST-PACKAGED-RUNTIME.ps1
 TEST-WINDOWS-SANDBOX.ps1
 VALIDATION-v0.964.txt
 VALIDATION-v0.965.txt
 VALIDATION-v0.966.txt
+VALIDATION-v0.967.txt
 VALIDATION.txt
 X99SecurebootPatcher-CLI.py
 X99SecurebootPatcher-GUI.py
@@ -65,6 +69,7 @@ tests/test_runtime.py
 tests/test_secureboot.py
 tests/test_session_logging.py
 tests/test_tool_inventory.py
+tests/test_windows_helper_permissions.py
 tools/README.txt
 x99sb/__init__.py
 x99sb/buildprogress.py

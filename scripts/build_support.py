@@ -136,7 +136,7 @@ def seal_collection(binaries: list, runtime_source: Path, kind: str, versions: d
                 raise RuntimeError(f'GUI native dependency was not collected: {name}')
             roots.append(by_name[name])
     manifest = {
-        'schema': 1, 'app_version': '0.966', 'kind': kind, 'versions': versions,
+        'schema': 1, 'app_version': '0.967', 'kind': kind, 'versions': versions,
         'files': {relative: {'sha256': sha256(path.read_bytes()).hexdigest()} for relative, path in sorted(files.items())},
         'preload': preload_order(files, by_name, roots),
     }

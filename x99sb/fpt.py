@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 from .tools import app_directory, sha256_file
-from .sessionlog import log, log_block, log_json
+from .sessionlog import log, log_block, log_json, log_exception
 from .constants import FPT_VERSION, FPT_SHA256, FPT_FILE_SHA256, FPT_SOURCE_FOLDER_URL
 from .fpt_elevation import needs_elevation, run_elevated
 
@@ -402,8 +402,9 @@ def probe_fpt(callback: EventCallback | None = None) -> dict[str, Any]:
         try:
             result = run_elevated('probe', callback=callback)
         except Exception as exc:
+            log_exception('FPT HELPER EXCHANGE', exc)
             result = {'ready': False, 'hvci': None, 'probe': None,
-                      'reason': 'administrator-permission', 'message': str(exc)}
+                      'reason': getattr(exc, 'reason', 'helper-exchange-failed'), 'message': str(exc)}
         _log_probe_summary(result)
         return result
     hvci = memory_integrity_running()
@@ -418,6 +419,16 @@ def probe_fpt(callback: EventCallback | None = None) -> dict[str, Any]:
         return result
     if run.success:
         result = {'ready': True, 'hvci': hvci, 'probe': asdict(run), 'reason': 'ok', 'message': 'BIOS dump and flash are available.'}
+        _log_probe_summary(result)
+        return result
+    if re.search(r'-2146762484|0x800b010c', '\n'.join(run.transcript), re.IGNORECASE):
+        result = {
+            'ready': False, 'hvci': hvci, 'probe': asdict(run),
+            'reason': 'driver-certificate-revoked',
+            'message': ('Windows rejected the Intel FPT driver with certificate-revoked error 0x800B010C. '
+                        'This is a driver trust failure; administrator permission and the correct tool DLLs do not resolve it. '
+                        'Use a supported firmware-update method. See LOGS for the complete driver error.'),
+        }
         _log_probe_summary(result)
         return result
     if hvci is True:

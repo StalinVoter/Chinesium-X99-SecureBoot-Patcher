@@ -1,10 +1,24 @@
-# Chinesium X99 SecureBoot Patcher v0.966
+# Chinesium X99 SecureBoot Patcher v0.967
 
 A Windows utility for updating the **factory-default Secure Boot PK, KEK and db certificates** stored in AMI Aptio-style X99 firmware images, with integrated Intel FPT BIOS dump and flash support.
 
 The Secure Boot patcher is driven by firmware structure rather than a hard-coded motherboard list. Unknown or malformed Secure Boot layouts fail closed instead of being guessed.
 
-## New in v0.966: tool checks, verified downloads and file drops
+## New in v0.967: reliable BIOS helper results
+
+The normal GUI creates the helper's reply files before requesting elevation.
+The elevated helper writes those files in place, preserving their permissions.
+Cleanup errors cannot replace an operation result. Helper launch, cancelled
+approval, result-file access, invalid results and driver trust failures have
+separate diagnostics and exception tracebacks in LOGS.
+
+`TEST-ELEVATED-HELPER.cmd` checks the packaged GUI/CLI handoff without BIOS
+access. Run it normally and approve the helper request. Its JSON report in
+`LOGS/elevated-helper-test.json` records the caller's elevation state and the
+result. Both EXEs must remain together. An elevated CI run does not test the
+interactive consent prompt on a user's PC.
+
+## Tool checks, verified downloads and file drops (introduced in v0.966)
 
 The GUI checks all four required files in the `tools` folder beside the EXE
 on every launch. Each missing or incorrect file has its own **Download this
@@ -37,7 +51,7 @@ Session logging now begins before the Qt import.
 The build must pass actual GUI/CLI EXE self-tests and a launch with conflicting
 DLLs beside the EXE and in PATH before it creates the release ZIP. See
 `RUNTIME-DEPENDENCIES.md` for the implementation and test procedure. See
-`VALIDATION-v0.966.txt` for the checks actually performed on this source.
+`VALIDATION-v0.967.txt` for the checks actually performed on this source.
 
 ## Secure Boot update
 
@@ -225,8 +239,8 @@ environment, compiles both EXEs, verifies their embedded DLLs, runs the actual
 packaged runtime tests and creates:
 
 ```text
-Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip
-Chinesium-X99-SecureBoot-Patcher-v0.966-Windows-x64.zip.sha256
+Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip
+Chinesium-X99-SecureBoot-Patcher-v0.967-Windows-x64.zip.sha256
 ```
 
 External UEFIReplace/FPT binaries are not needed to compile or test GUI
@@ -254,7 +268,7 @@ After flashing, use the motherboard's Secure Boot / Key Management menu to clear
 
 ## Version
 
-Public release version: **v0.966**.
+Public release version: **v0.967**.
 
 ## Automated Windows releases
 
